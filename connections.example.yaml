@@ -1,0 +1,51 @@
+# DB Simplifier - Connection Configuration
+# Copy this file to connections.yaml and fill in your values.
+# connections.yaml is gitignored - never commit real credentials.
+#
+# Password supports ${ENV_VAR} interpolation, e.g. password: "${PROD_DB_PASS}"
+
+environments:
+  development:
+    databases:
+      users_db:
+        host: localhost
+        port: 5432
+        dbname: users
+        user: dev_user
+        password: dev_pass
+      orders_db:
+        host: localhost
+        port: 5433
+        dbname: orders
+        user: dev_user
+        password: dev_pass
+
+  staging:
+    databases:
+      users_db:
+        host: staging-db.internal
+        port: 5432
+        dbname: users
+        user: staging_user
+        password: "${STAGING_DB_PASSWORD}"
+      orders_db:
+        host: staging-db.internal
+        port: 5433
+        dbname: orders
+        user: staging_user
+        password: "${STAGING_DB_PASSWORD}"
+
+  production:
+    databases:
+      users_db:
+        host: prod-db.internal
+        port: 5432
+        dbname: users
+        user: readonly_user
+        password: "${PROD_DB_PASSWORD}"
+      orders_db:
+        host: prod-db.internal
+        port: 5433
+        dbname: orders
+        user: readonly_user
+        password: "${PROD_DB_PASSWORD}"
