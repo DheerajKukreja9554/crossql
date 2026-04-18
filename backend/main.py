@@ -109,7 +109,7 @@ async def switch_environment(body: SwitchEnvRequest, request: Request):
     request.app.state.schema_cache = schema
 
     status = {k: DbStatus(v) for k, v in raw_status.items()}
-    return SwitchEnvResponse(env=body.env, status=status, schema=schema)
+    return SwitchEnvResponse(env=body.env, status=status, db_schema=schema)
 
 
 @app.get("/api/schema", response_model=SchemaResponse)

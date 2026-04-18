@@ -34,6 +34,7 @@ class SubQueryResult:
     df: pd.DataFrame
     elapsed_ms: float
     duckdb_alias: str
+    table_names: list[str]  # real table names to register in DuckDB
 
 
 @dataclass
@@ -173,6 +174,7 @@ async def _run_sub_query(sq: SubQuery, manager: ConnectionManager) -> SubQueryRe
         df=df,
         elapsed_ms=elapsed_ms,
         duckdb_alias=sq.duckdb_alias,
+        table_names=list(sq.alias_to_table.values()),
     )
 
 
@@ -210,19 +212,18 @@ def _merge_in_duckdb(
 ) -> tuple[pd.DataFrame, list[dict], list[str]]:
     """Register sub-results in DuckDB and execute the merge SQL.
 
-    Tables are registered by alias (not table name) to avoid name collisions.
+    The merge SQL uses 'FROM table_name AS alias', so we register DataFrames
+    by their actual table names (not SQL aliases). For a DB with one table,
+    we register the result under that table name. For multi-table same-DB
+    sub-queries the result is registered under each table name it covers.
     """
     conn = duckdb.connect()
 
-    # Register each sub-result DataFrame as a DuckDB table using alias
     for sub in sub_results:
-        if not sub.df.empty:
-            # Each sub-query may cover multiple tables (their aliases are the table names
-            # in the rewritten merge SQL). Register by the alias used in merge_sql.
-            conn.register(sub.duckdb_alias, sub.df)
-        else:
-            # Register empty DataFrame to avoid "table not found" errors
-            conn.register(sub.duckdb_alias, pd.DataFrame())
+        df = sub.df if not sub.df.empty else pd.DataFrame()
+        # Register under each table name this sub-result covers
+        for table_name in sub.table_names:
+            conn.register(table_name, df)
 
     try:
         result_df = conn.execute(merge_sql).df()

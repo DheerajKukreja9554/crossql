@@ -24,7 +24,7 @@ export interface QueryResult {
 export interface SwitchEnvResult {
   env: string;
   status: DbStatus;
-  schema: SchemaCache;
+  db_schema: SchemaCache;
 }
 
 export interface PythonResult {

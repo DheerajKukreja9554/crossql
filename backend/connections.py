@@ -93,7 +93,7 @@ class ConnectionManager:
             port=db_cfg.port,
             database=db_cfg.dbname,
             user=db_cfg.user,
-            password=db_cfg.password,
+            password=db_cfg.resolved_password(),
             min_size=1,
             max_size=5,
             command_timeout=70,  # slightly above the 60s query timeout

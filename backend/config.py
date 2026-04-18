@@ -10,31 +10,42 @@ import yaml
 from pydantic import BaseModel, field_validator, model_validator
 
 
+def _interpolate_env_vars(value: str) -> str:
+    """Replace ${VAR} with the value of environment variable VAR.
+
+    Raises ValueError if a referenced variable is not set.
+    Called lazily when a connection pool is actually created (not at config load time),
+    so you can have staging/prod entries in connections.yaml without setting those env vars locally.
+    """
+    pattern = re.compile(r"\$\{(\w+)\}")
+
+    def replace(match: re.Match) -> str:
+        var_name = match.group(1)
+        value = os.environ.get(var_name)
+        if value is None:
+            raise ValueError(
+                f"Environment variable '{var_name}' is not set. "
+                f"Set it before switching to this environment."
+            )
+        return value
+
+    return pattern.sub(replace, value)
+
+
 class DatabaseConfig(BaseModel):
     host: str
     port: int
     dbname: str
     user: str
-    password: str
+    password: str  # may contain ${ENV_VAR} — resolved lazily in connections.py
 
-    @field_validator("password", mode="before")
-    @classmethod
-    def interpolate_env_vars(cls, v: str) -> str:
-        """Replace ${VAR} with the value of environment variable VAR."""
-        pattern = re.compile(r"\$\{(\w+)\}")
-
-        def replace(match: re.Match) -> str:
-            var_name = match.group(1)
-            value = os.environ.get(var_name)
-            if value is None:
-                raise ValueError(f"Environment variable '{var_name}' is not set")
-            return value
-
-        return pattern.sub(replace, str(v))
+    def resolved_password(self) -> str:
+        """Return the password with ${ENV_VAR} placeholders interpolated."""
+        return _interpolate_env_vars(self.password)
 
     @property
     def dsn(self) -> str:
-        return f"postgresql://{self.user}:{self.password}@{self.host}:{self.port}/{self.dbname}"
+        return f"postgresql://{self.user}:{self.resolved_password()}@{self.host}:{self.port}/{self.dbname}"
 
 
 class EnvironmentConfig(BaseModel):

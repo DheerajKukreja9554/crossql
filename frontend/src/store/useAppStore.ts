@@ -72,7 +72,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       set({
         activeEnv: res.env,
         dbStatus: res.status,
-        schema: res.schema,
+        schema: res.db_schema,
         queryResult: null,
         queryError: null,
         pythonResult: null,

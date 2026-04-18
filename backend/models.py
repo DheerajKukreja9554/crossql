@@ -42,8 +42,8 @@ class DbStatus(str, Enum):
 
 class SwitchEnvResponse(BaseModel):
     env: str
-    status: dict[str, DbStatus]          # {db_name: "ok"|"error"}
-    schema: dict[str, dict[str, list[str]]]  # SchemaCache: {db: {table: [cols]}}
+    status: dict[str, DbStatus]              # {db_name: "ok"|"error"}
+    db_schema: dict[str, dict[str, list[str]]]  # SchemaCache: {db: {table: [cols]}}
 
 
 # ── Schema ─────────────────────────────────────────────────────────────────────
