@@ -1,0 +1,367 @@
+/* CrossQL — design tokens + base styles */
+
+:root {
+  --font-sans: 'Inter Tight', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-display: 'Inter Tight', ui-sans-serif, system-ui, sans-serif;
+
+  /* radii */
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 10px;
+  --r-xl: 14px;
+
+  /* base scale (Linear-ish, dense) */
+  --s-1: 4px;
+  --s-2: 6px;
+  --s-3: 8px;
+  --s-4: 10px;
+  --s-5: 12px;
+  --s-6: 14px;
+  --s-7: 16px;
+  --s-8: 20px;
+  --s-9: 24px;
+  --s-10: 32px;
+
+  --tx-xs: 11px;
+  --tx-sm: 12px;
+  --tx-md: 13px;
+  --tx-lg: 14px;
+  --tx-xl: 16px;
+  --tx-2xl: 20px;
+  --tx-3xl: 28px;
+
+  --pad-row: 6px;
+  --pad-cell: 10px;
+
+  --shadow-pop: 0 8px 24px -4px rgba(0,0,0,.18), 0 2px 6px -2px rgba(0,0,0,.10);
+  --shadow-overlay: 0 24px 60px -12px rgba(0,0,0,.30), 0 4px 12px -4px rgba(0,0,0,.12);
+  --transition: 140ms cubic-bezier(.2,.6,.3,1);
+}
+
+/* ---------- THEME: DARK (default) ---------- */
+[data-theme="dark"], [data-theme="dark"][data-palette="default"] {
+  --bg-0: #0a0a0c;          /* page */
+  --bg-1: #101013;          /* surface */
+  --bg-2: #16171b;          /* raised */
+  --bg-3: #1c1d22;          /* hover */
+  --bg-4: #232429;          /* active / chip */
+  --bg-input: #131418;
+  --bg-overlay: rgba(8, 8, 10, .72);
+  --bg-tooltip: #1f2026;
+
+  --line-1: #1f2026;
+  --line-2: #2a2b32;
+  --line-3: #383942;
+
+  --tx-1: #f3f4f6;          /* primary */
+  --tx-2: #c7cad1;          /* secondary */
+  --tx-3: #8a8e98;          /* tertiary */
+  --tx-4: #5b5e67;          /* quaternary */
+  --tx-disabled: #3d3f47;
+
+  --acc: #7c5cff;           /* primary accent (indigo) */
+  --acc-soft: #1f1936;
+  --acc-text: #c4b6ff;
+  --acc-line: #3a2f6e;
+
+  --ok: #3ecf8e;
+  --ok-soft: #0f2418;
+  --ok-text: #6fe1aa;
+
+  --warn: #f5a524;
+  --warn-soft: #2a1f0a;
+  --warn-text: #f5c265;
+
+  --err: #ff5c6c;
+  --err-soft: #2a1014;
+  --err-text: #ff8c95;
+
+  --info: #4cc2ff;
+  --info-soft: #0d2233;
+  --info-text: #82d4ff;
+
+  /* env colors */
+  --env-prod: #ff5c6c;
+  --env-staging: #f5a524;
+  --env-sandbox: #4cc2ff;
+  --env-dev: #3ecf8e;
+
+  /* syntax */
+  --sx-keyword: #c97cff;
+  --sx-string: #a3e07e;
+  --sx-number: #f5c265;
+  --sx-fn: #82d4ff;
+  --sx-comment: #5b5e67;
+  --sx-operator: #c7cad1;
+  --sx-table: #ffb061;
+  --sx-column: #f3f4f6;
+  --sx-db: #7c5cff;
+}
+
+/* ---------- THEME: DARK · MATERIAL (warm charcoal, blue accent) ---------- */
+[data-theme="dark"][data-palette="material"] {
+  --bg-0: #1e1e1e;
+  --bg-1: #252526;
+  --bg-2: #2d2d30;
+  --bg-3: #37373d;
+  --bg-4: #3e3e42;
+  --bg-input: #1e1e1e;
+  --bg-overlay: rgba(20, 20, 20, .72);
+  --line-1: #333337;
+  --line-2: #45454a;
+  --line-3: #5a5a60;
+  --tx-1: #eceff1;
+  --tx-2: #b0bec5;
+  --tx-3: #78909c;
+  --tx-4: #546e7a;
+  --acc: #82aaff;
+  --sx-keyword: #c792ea;
+  --sx-string: #c3e88d;
+  --sx-number: #f78c6c;
+  --sx-fn: #82aaff;
+  --sx-table: #ffcb6b;
+  --sx-db: #89ddff;
+  --sx-column: #eceff1;
+}
+
+/* ---------- THEME: DARK · DRACULA ---------- */
+[data-theme="dark"][data-palette="dracula"] {
+  --bg-0: #282a36;
+  --bg-1: #2e3140;
+  --bg-2: #353849;
+  --bg-3: #3f4252;
+  --bg-4: #44475a;
+  --bg-input: #21222c;
+  --bg-overlay: rgba(30, 30, 40, .72);
+  --line-1: #363847;
+  --line-2: #44475a;
+  --line-3: #565a70;
+  --tx-1: #f8f8f2;
+  --tx-2: #d0d1d8;
+  --tx-3: #a0a3b4;
+  --tx-4: #6272a4;
+  --acc: #bd93f9;
+  --sx-keyword: #ff79c6;
+  --sx-string: #f1fa8c;
+  --sx-number: #bd93f9;
+  --sx-fn: #50fa7b;
+  --sx-table: #ffb86c;
+  --sx-db: #8be9fd;
+}
+
+/* ---------- THEME: DARK · SOLARIZED ---------- */
+[data-theme="dark"][data-palette="solarized"] {
+  --bg-0: #002b36;
+  --bg-1: #073642;
+  --bg-2: #0b4551;
+  --bg-3: #15525f;
+  --bg-4: #1c5f6e;
+  --bg-input: #00232d;
+  --bg-overlay: rgba(0, 25, 30, .72);
+  --line-1: #0f4350;
+  --line-2: #1d5968;
+  --line-3: #2d6f80;
+  --tx-1: #fdf6e3;
+  --tx-2: #93a1a1;
+  --tx-3: #839496;
+  --tx-4: #586e75;
+  --acc: #2aa198;
+  --sx-keyword: #859900;
+  --sx-string: #2aa198;
+  --sx-number: #d33682;
+  --sx-fn: #268bd2;
+  --sx-table: #cb4b16;
+  --sx-db: #b58900;
+}
+
+/* ---------- THEME: DARK · GITHUB ---------- */
+[data-theme="dark"][data-palette="github"] {
+  --bg-0: #0d1117;
+  --bg-1: #161b22;
+  --bg-2: #1c2128;
+  --bg-3: #22272e;
+  --bg-4: #2d333b;
+  --bg-input: #0d1117;
+  --line-1: #21262d;
+  --line-2: #30363d;
+  --line-3: #444c56;
+  --tx-1: #e6edf3;
+  --tx-2: #adbac7;
+  --tx-3: #768390;
+  --tx-4: #545d68;
+  --acc: #58a6ff;
+  --sx-keyword: #ff7b72;
+  --sx-string: #a5d6ff;
+  --sx-number: #79c0ff;
+  --sx-fn: #d2a8ff;
+  --sx-table: #ffa657;
+  --sx-db: #7ee787;
+}
+
+/* ---------- THEME: DARK · NIGHT OWL (teal-navy) ---------- */
+[data-theme="dark"][data-palette="nightowl"] {
+  --bg-0: #011627;
+  --bg-1: #0b2942;
+  --bg-2: #12385a;
+  --bg-3: #1b4871;
+  --bg-4: #245684;
+  --bg-input: #01111d;
+  --line-1: #113353;
+  --line-2: #1c4569;
+  --line-3: #2a5680;
+  --tx-1: #d6deeb;
+  --tx-2: #8badd3;
+  --tx-3: #5f7e97;
+  --tx-4: #4b6479;
+  --acc: #82aaff;
+  --sx-keyword: #c792ea;
+  --sx-string: #ecc48d;
+  --sx-number: #f78c6c;
+  --sx-fn: #82aaff;
+  --sx-table: #ffcb6b;
+  --sx-db: #7fdbca;
+}
+
+/* ---------- THEME: LIGHT ---------- */
+[data-theme="light"] {
+  --bg-0: #fafafa;
+  --bg-1: #ffffff;
+  --bg-2: #f6f6f7;
+  --bg-3: #efeff1;
+  --bg-4: #e6e7ea;
+  --bg-input: #ffffff;
+  --bg-overlay: rgba(255,255,255,.72);
+  --bg-tooltip: #1f2026;
+
+  --line-1: #ececef;
+  --line-2: #dfe0e4;
+  --line-3: #cccdd2;
+
+  --tx-1: #0e0f12;
+  --tx-2: #3c3e44;
+  --tx-3: #6b6e76;
+  --tx-4: #9a9da4;
+  --tx-disabled: #c2c4ca;
+
+  --acc: #5b3df5;
+  --acc-soft: #ece8ff;
+  --acc-text: #4a2fd6;
+  --acc-line: #d6cfff;
+
+  --ok: #18a366;
+  --ok-soft: #e3f6ec;
+  --ok-text: #0f7a4d;
+
+  --warn: #c97a04;
+  --warn-soft: #fdf1d9;
+  --warn-text: #8a5102;
+
+  --err: #d53343;
+  --err-soft: #fde6e8;
+  --err-text: #9c1c2a;
+
+  --info: #1f8acb;
+  --info-soft: #e0f1fb;
+  --info-text: #0c5e90;
+
+  --env-prod: #d53343;
+  --env-staging: #c97a04;
+  --env-sandbox: #1f8acb;
+  --env-dev: #18a366;
+
+  --sx-keyword: #8430c9;
+  --sx-string: #226e2a;
+  --sx-number: #b25b00;
+  --sx-fn: #0c5e90;
+  --sx-comment: #9a9da4;
+  --sx-operator: #3c3e44;
+  --sx-table: #b25b00;
+  --sx-column: #0e0f12;
+  --sx-db: #5b3df5;
+}
+
+/* ---------- AESTHETIC: SOFT (Warp-ish, more rounded, more padding) ---------- */
+[data-aesthetic="soft"] {
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 18px;
+  --pad-row: 9px;
+  --pad-cell: 14px;
+}
+
+/* ---------- DENSITY ---------- */
+[data-density="comfortable"] {
+  --pad-row: 10px;
+  --pad-cell: 14px;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; }
+body {
+  background: var(--bg-0);
+  color: var(--tx-1);
+  font-family: var(--font-sans);
+  font-size: var(--tx-md);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "cv11", "ss01", "ss03";
+  overflow: hidden;
+}
+
+button, input, textarea, select { font: inherit; color: inherit; }
+button { background: none; border: 0; cursor: pointer; padding: 0; }
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--line-3); background-clip: padding-box; border: 2px solid transparent; }
+
+/* utility */
+.mono { font-family: var(--font-mono); font-size: 12.5px; }
+.kbd {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  background: var(--bg-3);
+  border: 1px solid var(--line-2);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 1px 5px;
+  color: var(--tx-2);
+  letter-spacing: .02em;
+}
+
+.dot {
+  width: 7px; height: 7px; border-radius: 999px; display: inline-block;
+}
+.dot.ok { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in oklch, var(--ok) 22%, transparent); }
+.dot.warn { background: var(--warn); }
+.dot.err { background: var(--err); }
+.dot.idle { background: var(--tx-4); }
+
+/* spinner */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 700ms linear infinite; transform-origin: center; }
+
+@keyframes pulse {
+  0%, 100% { opacity: .35; }
+  50% { opacity: 1; }
+}
+.pulse { animation: pulse 1.4s ease-in-out infinite; }
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes caret-blink { 50% { opacity: 0; } }
+.caret { display: inline-block; width: 1px; height: 14px; background: currentColor; vertical-align: -2px; animation: caret-blink 1s step-end infinite; margin-left: 1px; }
+
+/* focus */
+:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 1px;
+  border-radius: var(--r-sm);
+}

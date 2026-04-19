@@ -27,8 +27,16 @@ class ErrorResponse(BaseModel):
 
 # ── Environments ───────────────────────────────────────────────────────────────
 
+class EnvironmentInfo(BaseModel):
+    name: str
+    host: str
+    port: int
+    user: str
+
+
 class EnvironmentsResponse(BaseModel):
-    environments: list[str]
+    environments: list[EnvironmentInfo]
+    active: str | None = None
 
 
 class SwitchEnvRequest(BaseModel):
@@ -42,8 +50,22 @@ class DbStatus(str, Enum):
 
 class SwitchEnvResponse(BaseModel):
     env: str
-    status: dict[str, DbStatus]              # {db_name: "ok"|"error"}
-    db_schema: dict[str, dict[str, list[str]]]  # SchemaCache: {db: {table: [cols]}}
+    host: str
+    status: dict[str, DbStatus]                 # {db_name: "ok"|"error"}
+    db_schema: dict[str, dict[str, list[str]]]  # SchemaCache
+    discovered_dbs: list[str]                    # all discovered DBs
+    excluded_dbs: list[str]                      # system/excluded DBs
+
+
+# ── Config Reload ─────────────────────────────────────────────────────────────
+
+class ReloadConfigResponse(BaseModel):
+    env: str
+    host: str
+    status: dict[str, DbStatus]
+    db_schema: dict[str, dict[str, list[str]]]
+    discovered_dbs: list[str]
+    excluded_dbs: list[str]
 
 
 # ── Schema ─────────────────────────────────────────────────────────────────────
@@ -74,7 +96,7 @@ class RunQueryResponse(BaseModel):
     row_count: int
     timing: TimingInfo
     session_id: str
-    warning: str | None = None  # e.g. row limit approaching
+    warning: str | None = None
 
 
 # ── Python ─────────────────────────────────────────────────────────────────────

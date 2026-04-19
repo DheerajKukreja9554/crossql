@@ -11,28 +11,39 @@ import pytest_asyncio
 from testcontainers.postgres import PostgresContainer
 
 
-# ── Container fixtures ─────────────────────────────────────────────────────────
+# ── Container fixture — single server with multiple databases ─────────────────
 
 @pytest.fixture(scope="session")
-def users_container() -> Generator[PostgresContainer, None, None]:
-    with PostgresContainer("postgres:16-alpine", dbname="users", username="test", password="test") as pg:
-        yield pg
-
-
-@pytest.fixture(scope="session")
-def orders_container() -> Generator[PostgresContainer, None, None]:
-    with PostgresContainer("postgres:16-alpine", dbname="orders", username="test", password="test") as pg:
+def pg_container() -> Generator[PostgresContainer, None, None]:
+    """A single PostgreSQL container that hosts multiple databases."""
+    with PostgresContainer(
+        "postgres:16-alpine",
+        dbname="postgres",
+        username="test",
+        password="test",
+    ) as pg:
         yield pg
 
 
 @pytest_asyncio.fixture(scope="session")
-async def seeded_dbs(users_container, orders_container):
-    """Seed both containers with test data. Returns (users_dsn, orders_dsn)."""
-    users_dsn = users_container.get_connection_url().replace("postgresql+psycopg2", "postgresql")
-    orders_dsn = orders_container.get_connection_url().replace("postgresql+psycopg2", "postgresql")
+async def seeded_server(pg_container):
+    """Create and seed users + orders databases on the single server.
 
-    # Seed users
-    conn = await asyncpg.connect(users_dsn)
+    Returns (host, port, user, password) for the server.
+    """
+    dsn = pg_container.get_connection_url().replace("postgresql+psycopg2", "postgresql")
+    from urllib.parse import urlparse
+    p = urlparse(dsn)
+    host, port, user, password = p.hostname, p.port, p.username, p.password
+
+    # Connect to default postgres DB to create others
+    conn = await asyncpg.connect(host=host, port=port, user=user, password=password, database="postgres")
+    await conn.execute("CREATE DATABASE users")
+    await conn.execute("CREATE DATABASE orders")
+    await conn.close()
+
+    # Seed users database
+    conn = await asyncpg.connect(host=host, port=port, user=user, password=password, database="users")
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
@@ -49,8 +60,8 @@ async def seeded_dbs(users_container, orders_container):
     """)
     await conn.close()
 
-    # Seed orders
-    conn = await asyncpg.connect(orders_dsn)
+    # Seed orders database
+    conn = await asyncpg.connect(host=host, port=port, user=user, password=password, database="orders")
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS orders (
             id SERIAL PRIMARY KEY,
@@ -67,4 +78,4 @@ async def seeded_dbs(users_container, orders_container):
     """)
     await conn.close()
 
-    return users_dsn, orders_dsn
+    return host, port, user, password

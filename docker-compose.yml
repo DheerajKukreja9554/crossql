@@ -1,22 +1,13 @@
 services:
-  users_db:
+  postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: users
       POSTGRES_USER: dev_user
       POSTGRES_PASSWORD: dev_pass
+      POSTGRES_DB: postgres
     ports:
       - "5434:5432"
     volumes:
-      - ./docker/seed/users.sql:/docker-entrypoint-initdb.d/seed.sql
-
-  orders_db:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: orders
-      POSTGRES_USER: dev_user
-      POSTGRES_PASSWORD: dev_pass
-    ports:
-      - "5433:5432"
-    volumes:
-      - ./docker/seed/orders.sql:/docker-entrypoint-initdb.d/seed.sql
+      - ./docker/seed/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./docker/seed/users.sql:/docker-entrypoint-initdb.d/02-users.sql
+      - ./docker/seed/orders.sql:/docker-entrypoint-initdb.d/03-orders.sql

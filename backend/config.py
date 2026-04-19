@@ -1,4 +1,8 @@
-"""Load and validate connections.yaml with ${ENV_VAR} interpolation."""
+"""Load and validate connections.yaml with ${ENV_VAR} interpolation.
+
+New format: each environment is a server (host/port/user/password).
+Databases are auto-discovered via pg_database — not listed in YAML.
+"""
 
 from __future__ import annotations
 
@@ -7,7 +11,7 @@ import re
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, model_validator
 
 
 def _interpolate_env_vars(value: str) -> str:
@@ -21,41 +25,38 @@ def _interpolate_env_vars(value: str) -> str:
 
     def replace(match: re.Match) -> str:
         var_name = match.group(1)
-        value = os.environ.get(var_name)
-        if value is None:
+        val = os.environ.get(var_name)
+        if val is None:
             raise ValueError(
                 f"Environment variable '{var_name}' is not set. "
                 f"Set it before switching to this environment."
             )
-        return value
+        return val
 
     return pattern.sub(replace, value)
 
 
-class DatabaseConfig(BaseModel):
+# System databases to auto-exclude from discovery
+SYSTEM_DATABASES = frozenset({
+    "postgres", "template0", "template1",
+    "azure_maintenance", "azure_sys", "cloudsqladmin",
+    "rdsadmin",
+})
+
+
+class EnvironmentConfig(BaseModel):
+    """A single PostgreSQL server that may host many databases."""
     host: str
-    port: int
-    dbname: str
+    port: int = 5432
     user: str
-    password: str  # may contain ${ENV_VAR} — resolved lazily in connections.py
+    password: str  # may contain ${ENV_VAR} — resolved lazily
+
+    # Optional: databases to exclude beyond system defaults
+    exclude_databases: list[str] = []
 
     def resolved_password(self) -> str:
         """Return the password with ${ENV_VAR} placeholders interpolated."""
         return _interpolate_env_vars(self.password)
-
-    @property
-    def dsn(self) -> str:
-        return f"postgresql://{self.user}:{self.resolved_password()}@{self.host}:{self.port}/{self.dbname}"
-
-
-class EnvironmentConfig(BaseModel):
-    databases: dict[str, DatabaseConfig]
-
-    @model_validator(mode="after")
-    def at_least_one_db(self) -> "EnvironmentConfig":
-        if not self.databases:
-            raise ValueError("Each environment must define at least one database")
-        return self
 
 
 class AppConfig(BaseModel):
@@ -76,7 +77,7 @@ def load_config(path: Path | str | None = None) -> AppConfig:
 
     Raises:
         FileNotFoundError: If connections.yaml does not exist.
-        ValueError: If config is invalid or required env vars are missing.
+        ValueError: If config is invalid.
     """
     if path is None:
         path = Path(__file__).parent.parent / "connections.yaml"

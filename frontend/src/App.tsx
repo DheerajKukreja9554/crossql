@@ -1,35 +1,95 @@
 import { useEffect } from "react";
-import { EnvSwitcher } from "./components/EnvSwitcher";
+import { TopBar } from "./components/TopBar";
+import { Sidebar } from "./components/Sidebar";
 import { QueryEditor } from "./components/QueryEditor";
-import { ResultsTable } from "./components/ResultsTable";
+import { ResultsPanel } from "./components/ResultsPanel";
 import { PythonCell } from "./components/PythonCell";
+import { StatusBar } from "./components/StatusBar";
 import { useAppStore } from "./store/useAppStore";
 
 export default function App() {
-  const { loadEnvironments, runQuery } = useAppStore();
+  const {
+    loadEnvironments,
+    runQuery,
+    environments,
+    activeEnv,
+    activeHost,
+    dbStatus,
+    schema,
+    switchEnv,
+    reloadConfig,
+    theme,
+    setTheme,
+    queryResult,
+    queryError,
+    isQuerying,
+    pythonOpen,
+  } = useAppStore();
+
+  // Apply initial theme on mount
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.theme = theme;
+    root.dataset.palette = useAppStore.getState().palette;
+  }, [theme]);
 
   useEffect(() => {
     loadEnvironments();
   }, [loadEnvironments]);
 
+  const handleInsertRef = (ref: string) => {
+    // Could integrate with CodeMirror cursor position in the future
+    console.log("Insert reference:", ref);
+  };
+
   return (
     <div className="app">
-      {/* Top bar */}
-      <header className="topbar">
-        <span className="topbar__title">DB Simplifier</span>
-        <EnvSwitcher />
-      </header>
+      <TopBar
+        envId={activeEnv}
+        environments={environments}
+        activeHost={activeHost}
+        onSwitchEnv={switchEnv}
+        theme={theme}
+        onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
+        onReloadConfig={reloadConfig}
+      />
 
-      {/* Main content */}
-      <main className="main">
-        <QueryEditor onRun={runQuery} />
-        <ResultsTable />
-      </main>
+      <div className="app-body">
+        <Sidebar
+          schema={schema}
+          dbStatus={dbStatus}
+          activeHost={activeHost}
+          activeEnv={activeEnv}
+          onInsertRef={handleInsertRef}
+          onReloadConfig={reloadConfig}
+        />
 
-      {/* Python cell — bottom panel */}
-      <footer className="bottom-panel">
-        <PythonCell />
-      </footer>
+        <div className="workspace">
+          <div className="ws-sql">
+            <QueryEditor onRun={runQuery} />
+          </div>
+          <div className="ws-split" />
+          <div className="ws-results">
+            <ResultsPanel
+              queryResult={queryResult}
+              queryError={queryError}
+              isQuerying={isQuerying}
+            />
+          </div>
+          {pythonOpen && (
+            <>
+              <div className="ws-split" />
+              <div className="ws-python">
+                <PythonCell />
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {!pythonOpen && <PythonCell />}
+
+      <StatusBar />
     </div>
   );
 }

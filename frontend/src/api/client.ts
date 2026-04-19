@@ -1,5 +1,12 @@
 /** Typed API client — wraps all backend endpoints. */
 
+export interface EnvironmentInfo {
+  name: string;
+  host: string;
+  port: number;
+  user: string;
+}
+
 export interface DbStatus {
   [dbName: string]: "ok" | "error";
 }
@@ -23,8 +30,20 @@ export interface QueryResult {
 
 export interface SwitchEnvResult {
   env: string;
+  host: string;
   status: DbStatus;
   db_schema: SchemaCache;
+  discovered_dbs: string[];
+  excluded_dbs: string[];
+}
+
+export interface ReloadConfigResult {
+  env: string;
+  host: string;
+  status: DbStatus;
+  db_schema: SchemaCache;
+  discovered_dbs: string[];
+  excluded_dbs: string[];
 }
 
 export interface PythonResult {
@@ -61,7 +80,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 // ── Endpoints ─────────────────────────────────────────────────────────────────
 
 export const api = {
-  getEnvironments(): Promise<{ environments: string[] }> {
+  getEnvironments(): Promise<{
+    environments: EnvironmentInfo[];
+    active: string | null;
+  }> {
     return request("/api/environments");
   },
 
@@ -69,6 +91,12 @@ export const api = {
     return request("/api/environments/switch", {
       method: "POST",
       body: JSON.stringify({ env }),
+    });
+  },
+
+  reloadConfig(): Promise<ReloadConfigResult> {
+    return request("/api/config/reload", {
+      method: "POST",
     });
   },
 

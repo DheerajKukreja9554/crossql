@@ -1,4 +1,4 @@
-"""FastAPI app — DB Simplifier backend."""
+"""FastAPI app — CrossQL backend."""
 
 from __future__ import annotations
 
@@ -13,9 +13,11 @@ from config import load_config
 from connections import ConnectionManager
 from models import (
     DbStatus,
+    EnvironmentInfo,
     EnvironmentsResponse,
     ErrorCode,
     ErrorResponse,
+    ReloadConfigResponse,
     RunPythonRequest,
     RunPythonResponse,
     RunQueryRequest,
@@ -61,7 +63,7 @@ async def lifespan(app: FastAPI):
     logger.info("Shutdown complete")
 
 
-app = FastAPI(title="DB Simplifier", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="CrossQL", version="0.2.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -85,7 +87,17 @@ def _error(code: ErrorCode, message: str, detail: str = "", status: int = 400) -
 @app.get("/api/environments", response_model=EnvironmentsResponse)
 async def list_environments(request: Request):
     config = request.app.state.config
-    return EnvironmentsResponse(environments=list(config.environments.keys()))
+    manager: ConnectionManager = request.app.state.manager
+    envs = [
+        EnvironmentInfo(
+            name=name,
+            host=env_cfg.host,
+            port=env_cfg.port,
+            user=env_cfg.user,
+        )
+        for name, env_cfg in config.environments.items()
+    ]
+    return EnvironmentsResponse(environments=envs, active=manager.active_env)
 
 
 @app.post("/api/environments/switch", response_model=SwitchEnvResponse)
@@ -99,6 +111,8 @@ async def switch_environment(body: SwitchEnvRequest, request: Request):
             detail=f"Unknown environment: '{body.env}'. Available: {list(config.environments)}",
         )
 
+    env_cfg = config.environments[body.env]
+
     try:
         raw_status = await manager.switch_env(body.env)
     except Exception as e:
@@ -109,7 +123,54 @@ async def switch_environment(body: SwitchEnvRequest, request: Request):
     request.app.state.schema_cache = schema
 
     status = {k: DbStatus(v) for k, v in raw_status.items()}
-    return SwitchEnvResponse(env=body.env, status=status, db_schema=schema)
+    return SwitchEnvResponse(
+        env=body.env,
+        host=env_cfg.host,
+        status=status,
+        db_schema=schema,
+        discovered_dbs=manager.discovered_dbs,
+        excluded_dbs=sorted(manager.excluded_dbs),
+    )
+
+
+@app.post("/api/config/reload", response_model=ReloadConfigResponse)
+async def reload_config(request: Request):
+    """Reload connections.yaml and re-discover databases for the active environment."""
+    manager: ConnectionManager = request.app.state.manager
+
+    # Reload YAML
+    try:
+        config = load_config()
+    except Exception as e:
+        return _error(ErrorCode.CONNECTION_ERROR, f"Failed to reload config: {e}")
+
+    request.app.state.config = config
+    manager.update_config(config)
+
+    # Re-switch to current environment (re-discovers DBs)
+    active_env = manager.active_env
+    if not active_env or active_env not in config.environments:
+        active_env = next(iter(config.environments))
+
+    env_cfg = config.environments[active_env]
+
+    try:
+        raw_status = await manager.switch_env(active_env)
+    except Exception as e:
+        return _error(ErrorCode.CONNECTION_ERROR, str(e), status=503)
+
+    schema = await fetch_schema(manager)
+    request.app.state.schema_cache = schema
+
+    status = {k: DbStatus(v) for k, v in raw_status.items()}
+    return ReloadConfigResponse(
+        env=active_env,
+        host=env_cfg.host,
+        status=status,
+        db_schema=schema,
+        discovered_dbs=manager.discovered_dbs,
+        excluded_dbs=sorted(manager.excluded_dbs),
+    )
 
 
 @app.get("/api/schema", response_model=SchemaResponse)

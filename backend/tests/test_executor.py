@@ -4,46 +4,40 @@ from __future__ import annotations
 
 import pytest
 
-from config import AppConfig, DatabaseConfig, EnvironmentConfig
+from config import AppConfig, EnvironmentConfig
 from connections import ConnectionManager
 from query.executor import execute_query
 from query.parser import parse_query
 
 
-def _make_config(users_dsn: str, orders_dsn: str) -> AppConfig:
-    """Build an AppConfig from DSNs returned by testcontainers."""
-    def dsn_to_cfg(dsn: str, dbname: str) -> DatabaseConfig:
-        # DSN format: postgresql://user:pass@host:port/dbname
-        from urllib.parse import urlparse
-        p = urlparse(dsn)
-        return DatabaseConfig(
-            host=p.hostname,
-            port=p.port,
-            dbname=dbname,
-            user=p.username,
-            password=p.password,
-        )
-
+def _make_config(host: str, port: int, user: str, password: str) -> AppConfig:
+    """Build an AppConfig from server connection details."""
     return AppConfig(environments={
-        "test": EnvironmentConfig(databases={
-            "users_db": dsn_to_cfg(users_dsn, "users"),
-            "orders_db": dsn_to_cfg(orders_dsn, "orders"),
-        })
+        "test": EnvironmentConfig(
+            host=host,
+            port=port,
+            user=user,
+            password=password,
+        )
     })
 
 
 @pytest.mark.asyncio
-async def test_cross_db_join(seeded_dbs):
-    users_dsn, orders_dsn = seeded_dbs
-    config = _make_config(users_dsn, orders_dsn)
+async def test_cross_db_join(seeded_server):
+    host, port, user, password = seeded_server
+    config = _make_config(host, port, user, password)
 
     manager = ConnectionManager(config)
     await manager.switch_env("test")
 
+    # Verify auto-discovery found our databases
+    assert "users" in manager.known_dbs
+    assert "orders" in manager.known_dbs
+
     sql = """
     SELECT u.name, o.total, o.status
-    FROM users_db.users u
-    JOIN orders_db.orders o ON u.id = o.user_id
+    FROM users.users u
+    JOIN orders.orders o ON u.id = o.user_id
     WHERE u.active = true AND o.status = 'paid'
     ORDER BY o.total DESC
     """
@@ -55,20 +49,19 @@ async def test_cross_db_join(seeded_dbs):
     assert result.row_count > 0
     assert "name" in result.columns
     assert "total" in result.columns
-    # All results should be paid and active users
     for row in result.rows:
         assert row["status"] == "paid"
 
 
 @pytest.mark.asyncio
-async def test_single_db_passthrough(seeded_dbs):
-    users_dsn, orders_dsn = seeded_dbs
-    config = _make_config(users_dsn, orders_dsn)
+async def test_single_db_passthrough(seeded_server):
+    host, port, user, password = seeded_server
+    config = _make_config(host, port, user, password)
 
     manager = ConnectionManager(config)
     await manager.switch_env("test")
 
-    sql = "SELECT * FROM users_db.users WHERE active = true"
+    sql = "SELECT * FROM users.users WHERE active = true"
     plan = parse_query(sql, manager.known_dbs)
     assert plan.is_single_db is True
 
@@ -77,3 +70,29 @@ async def test_single_db_passthrough(seeded_dbs):
 
     assert result.row_count == 2  # Alice and Bob are active
     assert result.duckdb_ms == 0.0  # DuckDB not used for single-DB
+
+
+@pytest.mark.asyncio
+async def test_auto_discovery(seeded_server):
+    """Verify that the connection manager auto-discovers databases."""
+    host, port, user, password = seeded_server
+    config = _make_config(host, port, user, password)
+
+    manager = ConnectionManager(config)
+    status = await manager.switch_env("test")
+
+    # Should have discovered users and orders
+    assert "users" in status
+    assert "orders" in status
+    assert status["users"] == "ok"
+    assert status["orders"] == "ok"
+
+    # postgres should be excluded as system DB
+    assert "postgres" not in status
+
+    # discovered_dbs should include all (even excluded ones)
+    assert "postgres" in manager.discovered_dbs
+    assert "users" in manager.discovered_dbs
+    assert "orders" in manager.discovered_dbs
+
+    await manager.close()
