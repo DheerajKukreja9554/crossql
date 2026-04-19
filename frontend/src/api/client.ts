@@ -66,13 +66,39 @@ export interface AppError {
 // ── Fetch helper ──────────────────────────────────────────────────────────────
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
-    headers: { "Content-Type": "application/json" },
-    ...init,
-  });
-  const data = await res.json();
+  let res: Response;
+  try {
+    res = await fetch(path, {
+      headers: { "Content-Type": "application/json" },
+      ...init,
+    });
+  } catch (e) {
+    throw {
+      error: "Network error",
+      detail: `Could not connect to backend: ${e}`,
+      code: "CONNECTION_ERROR",
+    } as AppError;
+  }
+
+  let data: unknown;
+  try {
+    data = await res.json();
+  } catch {
+    throw {
+      error: `HTTP ${res.status}`,
+      detail: `Server returned non-JSON response (${res.statusText})`,
+      code: "CONNECTION_ERROR",
+    } as AppError;
+  }
+
   if (!res.ok) {
-    throw data as AppError;
+    // Ensure the error has the expected shape
+    const err = data as Record<string, unknown>;
+    throw {
+      error: String(err.error || `HTTP ${res.status}`),
+      detail: String(err.detail || err.error || res.statusText),
+      code: String(err.code || "CONNECTION_ERROR"),
+    } as AppError;
   }
   return data as T;
 }

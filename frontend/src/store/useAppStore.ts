@@ -147,8 +147,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
         return;
       }
       set({ queryResult: result as QueryResult, isQuerying: false });
-    } catch (err) {
-      set({ queryError: err as AppError, isQuerying: false });
+    } catch (err: unknown) {
+      const appErr = (err && typeof err === "object" && "code" in err)
+        ? err as AppError
+        : { error: String(err), detail: "", code: "CONNECTION_ERROR" as const };
+      set({ queryError: appErr, isQuerying: false });
     }
   },
 

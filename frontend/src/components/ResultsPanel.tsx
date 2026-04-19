@@ -117,11 +117,11 @@ export function ResultsPanel({ queryResult, queryError, isQuerying }: ResultsPan
           <div className="err-head">
             <Icons.errCircle size={18} />
             <div>
-              <div className="err-title">{queryError.code.replace(/_/g, " ")}</div>
-              <div className="err-sub">{queryError.error}</div>
+              <div className="err-title">{(queryError.code || "ERROR").replace(/_/g, " ")}</div>
+              <div className="err-sub">{queryError.error || "An unexpected error occurred"}</div>
             </div>
           </div>
-          <pre className="err-msg">{queryError.detail}</pre>
+          {queryError.detail && <pre className="err-msg">{queryError.detail}</pre>}
         </div>
       </div>
     );
