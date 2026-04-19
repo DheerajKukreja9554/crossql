@@ -23,7 +23,6 @@ export default function App() {
     queryResult,
     queryError,
     isQuerying,
-    pythonOpen,
   } = useAppStore();
 
   // Apply initial theme on mount
@@ -76,18 +75,12 @@ export default function App() {
               isQuerying={isQuerying}
             />
           </div>
-          {pythonOpen && (
-            <>
-              <div className="ws-split" />
-              <div className="ws-python">
-                <PythonCell />
-              </div>
-            </>
-          )}
+          <div className="ws-split" />
+          <div className="ws-python">
+            <PythonCell />
+          </div>
         </div>
       </div>
-
-      {!pythonOpen && <PythonCell />}
 
       <StatusBar />
     </div>

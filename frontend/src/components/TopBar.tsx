@@ -119,11 +119,13 @@ export function TopBar({
 
         {/* Refresh config */}
         <button
-          className="icon-btn"
+          className="btn-ghost"
           onClick={onReloadConfig}
-          title="Reload configuration"
+          title="Reload connections.yaml and re-discover databases"
+          style={{ display: "flex", alignItems: "center", gap: 6 }}
         >
-          <Icons.refresh size={14} />
+          <Icons.refresh size={13} />
+          <span>Refresh</span>
         </button>
       </div>
     </div>

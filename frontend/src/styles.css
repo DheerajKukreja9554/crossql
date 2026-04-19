@@ -237,7 +237,7 @@ button { background: none; border: 0; cursor: pointer; padding: 0; }
 .workspace { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .ws-sql { flex: 0 0 34%; min-height: 160px; display: flex; }
 .ws-results { flex: 1; min-height: 0; display: flex; }
-.ws-python { flex: 0 0 auto; max-height: 44%; display: flex; overflow: auto; border-top: 1px solid var(--line-1); }
+.ws-python { flex: 0 0 auto; display: flex; overflow: auto; }
 .ws-split { height: 1px; background: var(--line-1); flex-shrink: 0; }
 
 /* ── TopBar ── */
@@ -591,7 +591,7 @@ button { background: none; border: 0; cursor: pointer; padding: 0; }
 }
 
 /* ── Python Cell ── */
-.py-wrap { display: flex; flex-direction: column; background: var(--bg-0); min-height: 0; flex: 1; }
+.py-wrap { display: flex; flex-direction: column; background: var(--bg-0); min-height: 0; flex: 1; border-top: 1px solid var(--line-1); }
 .py-head {
   display: flex; align-items: center; justify-content: space-between;
   padding: 6px 10px 6px 12px; background: var(--bg-1);
@@ -600,7 +600,7 @@ button { background: none; border: 0; cursor: pointer; padding: 0; }
 .py-head-left { display: flex; align-items: center; gap: 8px; }
 .py-head-right { display: flex; align-items: center; gap: 8px; }
 .py-meta { font-size: var(--tx-xs); color: var(--tx-3); }
-.py-body { display: flex; flex-direction: column; }
+.py-body { display: flex; flex-direction: column; max-height: 300px; overflow: auto; }
 
 .py-code {
   padding: 12px 14px 12px 52px; position: relative;

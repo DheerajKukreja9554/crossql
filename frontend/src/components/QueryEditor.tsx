@@ -1,9 +1,12 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { sql, PostgreSQL } from "@codemirror/lang-sql";
 import { oneDark } from "@codemirror/theme-one-dark";
+import { autocompletion } from "@codemirror/autocomplete";
+import type { CompletionContext, CompletionResult } from "@codemirror/autocomplete";
 import { Icons } from "./Icons";
 import { useAppStore } from "../store/useAppStore";
+import type { SchemaCache } from "../api/client";
 
 const DEFAULT_SQL = `-- Cross-DB query: use db_name.table notation
 SELECT u.name, o.total, o.status
@@ -16,6 +19,104 @@ interface QueryEditorProps {
   onRun: (sql: string) => void;
 }
 
+/** Build a custom autocomplete source that suggests db names, tables, and columns */
+function buildCompletionSource(schema: SchemaCache) {
+  return (context: CompletionContext): CompletionResult | null => {
+    // Match word characters and dots (for db.table.column patterns)
+    const word = context.matchBefore(/[\w.]*/)
+    if (!word || (word.from === word.to && !context.explicit)) return null;
+
+    const text = word.text;
+    const parts = text.split(".");
+    const options: { label: string; type: string; detail?: string; boost?: number }[] = [];
+
+    if (parts.length === 1) {
+      // Suggest database names
+      for (const dbName of Object.keys(schema)) {
+        options.push({
+          label: dbName,
+          type: "keyword",
+          detail: "database",
+          boost: 2,
+        });
+      }
+      // Also suggest db.table for quick access
+      for (const [dbName, tables] of Object.entries(schema)) {
+        for (const tableName of Object.keys(tables)) {
+          options.push({
+            label: `${dbName}.${tableName}`,
+            type: "class",
+            detail: `table in ${dbName}`,
+            boost: 1,
+          });
+        }
+      }
+    } else if (parts.length === 2) {
+      const dbName = parts[0];
+      const tables = schema[dbName];
+      if (tables) {
+        // Suggest table names for this database
+        for (const [tableName, cols] of Object.entries(tables)) {
+          options.push({
+            label: tableName,
+            type: "class",
+            detail: `${cols.length} columns`,
+            boost: 2,
+          });
+        }
+      }
+    } else if (parts.length === 3) {
+      const dbName = parts[0];
+      const tableName = parts[1];
+      const cols = schema[dbName]?.[tableName];
+      if (cols) {
+        // Suggest column names for this table
+        for (const col of cols) {
+          options.push({
+            label: col,
+            type: "property",
+            detail: `column in ${tableName}`,
+            boost: 2,
+          });
+        }
+      }
+    }
+
+    // Also add column names as global suggestions (for use after aliases)
+    if (parts.length === 1) {
+      const seenCols = new Set<string>();
+      for (const tables of Object.values(schema)) {
+        for (const [tableName, cols] of Object.entries(tables)) {
+          for (const col of cols) {
+            if (!seenCols.has(col)) {
+              seenCols.add(col);
+              options.push({
+                label: col,
+                type: "property",
+                detail: `column in ${tableName}`,
+                boost: 0,
+              });
+            }
+          }
+        }
+      }
+    }
+
+    if (options.length === 0) return null;
+
+    // For dotted completions, only replace after the last dot
+    const from = parts.length > 1
+      ? word.from + text.lastIndexOf(".") + 1
+      : word.from;
+
+    return {
+      from,
+      options,
+      validFor: /^[\w]*$/,
+    };
+  };
+}
+
 export function QueryEditor({ onRun }: QueryEditorProps) {
   const { isQuerying, schema, theme } = useAppStore();
   const [value, setValue] = useState(DEFAULT_SQL);
@@ -24,13 +125,18 @@ export function QueryEditor({ onRun }: QueryEditorProps) {
     if (value.trim()) onRun(value);
   }, [value, onRun]);
 
-  // Build autocomplete schema for CodeMirror
-  const cmSchema: Record<string, string[]> = {};
-  for (const [dbName, tables] of Object.entries(schema)) {
-    for (const [tableName, cols] of Object.entries(tables)) {
-      cmSchema[`${dbName}.${tableName}`] = cols;
-    }
-  }
+  // Build CodeMirror extensions with autocomplete
+  const extensions = useMemo(() => {
+    const completionSource = buildCompletionSource(schema);
+    return [
+      sql({ dialect: PostgreSQL, upperCaseKeywords: true }),
+      autocompletion({
+        override: [completionSource],
+        activateOnTyping: true,
+        maxRenderedOptions: 20,
+      }),
+    ];
+  }, [schema]);
 
   // Count referenced databases from the SQL
   const dbNames = Object.keys(schema);
@@ -92,19 +198,13 @@ export function QueryEditor({ onRun }: QueryEditorProps) {
         <CodeMirror
           value={value}
           onChange={setValue}
-          extensions={[
-            sql({
-              dialect: PostgreSQL,
-              schema: cmSchema,
-              upperCaseKeywords: true,
-            }),
-          ]}
+          extensions={extensions}
           theme={theme === "dark" ? oneDark : undefined}
           basicSetup={{
             lineNumbers: true,
             foldGutter: false,
             highlightActiveLineGutter: true,
-            autocompletion: true,
+            autocompletion: false, // we handle it via extensions
           }}
           style={{
             height: "100%",
