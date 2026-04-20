@@ -236,7 +236,7 @@ button { background: none; border: 0; cursor: pointer; padding: 0; }
 .app-body { flex: 1; display: flex; min-height: 0; }
 .workspace { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .ws-sql { flex: 0 0 34%; min-height: 160px; display: flex; }
-.ws-results { flex: 1; min-height: 0; display: flex; }
+.ws-results { flex: 1; min-height: 0; display: flex; overflow: hidden; }
 .ws-python { flex: 0 0 auto; display: flex; overflow: auto; }
 .ws-split { height: 1px; background: var(--line-1); flex-shrink: 0; }
 
@@ -507,7 +507,7 @@ button { background: none; border: 0; cursor: pointer; padding: 0; }
 .editor-body .cm-editor.cm-focused { outline: none; }
 
 /* ── Results ── */
-.results-wrap { display: flex; flex-direction: column; flex: 1; min-height: 0; background: var(--bg-0); }
+.results-wrap { display: flex; flex-direction: column; flex: 1; min-height: 0; max-height: 100%; overflow: hidden; background: var(--bg-0); }
 .results-head {
   display: flex; align-items: center; justify-content: space-between;
   padding: 6px 10px 6px 12px; background: var(--bg-1);

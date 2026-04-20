@@ -8,7 +8,7 @@ import {
   completionKeymap,
 } from "@codemirror/autocomplete";
 import type { CompletionContext, CompletionResult } from "@codemirror/autocomplete";
-import { keymap, type KeyBinding } from "@codemirror/view";
+import { keymap } from "@codemirror/view";
 import { Prec } from "@codemirror/state";
 import { Icons } from "./Icons";
 import { useAppStore } from "../store/useAppStore";
@@ -175,14 +175,12 @@ export function QueryEditor({ onRun }: QueryEditorProps) {
   // Build CodeMirror extensions with alias-aware autocomplete + Tab to accept
   const extensions = useMemo(() => {
     const completionSource = buildCompletionSource(schema, value);
-    // Custom keymap: Tab accepts, Enter does NOT accept completions
-    const tabAccept: KeyBinding[] = [
-      { key: "Tab", run: acceptCompletion },
-    ];
-    // Filter out Enter from the default completion keymap
-    const filteredCompletionKeymap = completionKeymap.filter(
-      (k) => k.key !== "Enter"
-    );
+
+    // Keep all default completion keybindings (ArrowUp/Down, Escape, etc.)
+    // but replace Enter with Tab for accepting
+    const customCompletionKeymap = completionKeymap
+      .filter((k) => k.key !== "Enter")
+      .concat([{ key: "Tab", run: acceptCompletion }]);
 
     return [
       sql({ dialect: PostgreSQL, upperCaseKeywords: true }),
@@ -190,10 +188,9 @@ export function QueryEditor({ onRun }: QueryEditorProps) {
         override: [completionSource],
         activateOnTyping: true,
         maxRenderedOptions: 20,
-        defaultKeymap: false, // we provide our own keymap below
+        defaultKeymap: false,
       }),
-      Prec.highest(keymap.of(tabAccept)),
-      keymap.of(filteredCompletionKeymap),
+      Prec.highest(keymap.of(customCompletionKeymap)),
     ];
   }, [schema, value]);
 
