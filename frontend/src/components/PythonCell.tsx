@@ -20,7 +20,6 @@ export function PythonCell() {
     pythonOpen,
     setPythonOpen,
     theme,
-    dbStatus,
   } = useAppStore();
   const [code, setCode] = useState(DEFAULT_PYTHON);
 
@@ -61,21 +60,19 @@ export function PythonCell() {
             </span>
             <span className="editor-head-title">Python cell</span>
           </button>
-          {hasData && (
+          {hasData && queryResult && (
             <span className="editor-head-sub">
               <span className="mono" style={{ color: "var(--sx-db)" }}>
                 df
               </span>
-              {Object.keys(dbStatus)
-                .filter((db) => dbStatus[db] === "ok")
-                .map((db) => (
-                  <span key={db}>
-                    <span style={{ color: "var(--tx-4)" }}> · </span>
-                    <span className="mono" style={{ color: "var(--sx-db)" }}>
-                      df_{db}
-                    </span>
+              {Object.keys(queryResult.timing.per_db).map((db) => (
+                <span key={db}>
+                  <span style={{ color: "var(--tx-4)" }}> · </span>
+                  <span className="mono" style={{ color: "var(--sx-db)" }}>
+                    df_{db}
                   </span>
-                ))}
+                </span>
+              ))}
             </span>
           )}
         </div>
