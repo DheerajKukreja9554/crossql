@@ -5,9 +5,11 @@ import { oneDark } from "@codemirror/theme-one-dark";
 import {
   autocompletion,
   acceptCompletion,
+  completionKeymap,
 } from "@codemirror/autocomplete";
 import type { CompletionContext, CompletionResult } from "@codemirror/autocomplete";
-import { keymap } from "@codemirror/view";
+import { keymap, type KeyBinding } from "@codemirror/view";
+import { Prec } from "@codemirror/state";
 import { Icons } from "./Icons";
 import { useAppStore } from "../store/useAppStore";
 import type { SchemaCache } from "../api/client";
@@ -173,16 +175,25 @@ export function QueryEditor({ onRun }: QueryEditorProps) {
   // Build CodeMirror extensions with alias-aware autocomplete + Tab to accept
   const extensions = useMemo(() => {
     const completionSource = buildCompletionSource(schema, value);
+    // Custom keymap: Tab accepts, Enter does NOT accept completions
+    const tabAccept: KeyBinding[] = [
+      { key: "Tab", run: acceptCompletion },
+    ];
+    // Filter out Enter from the default completion keymap
+    const filteredCompletionKeymap = completionKeymap.filter(
+      (k) => k.key !== "Enter"
+    );
+
     return [
       sql({ dialect: PostgreSQL, upperCaseKeywords: true }),
       autocompletion({
         override: [completionSource],
         activateOnTyping: true,
         maxRenderedOptions: 20,
-        defaultKeymap: false, // disable default Enter to accept
+        defaultKeymap: false, // we provide our own keymap below
       }),
-      // Tab accepts completion; Enter does NOT accept (inserts newline instead)
-      keymap.of([{ key: "Tab", run: acceptCompletion }]),
+      Prec.highest(keymap.of(tabAccept)),
+      keymap.of(filteredCompletionKeymap),
     ];
   }, [schema, value]);
 

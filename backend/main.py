@@ -9,6 +9,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from pathlib import Path
+
 from config import load_config
 from connections import ConnectionManager
 from models import (
@@ -32,7 +34,17 @@ from query.parser import ParseError, parse_query
 from query.schema import fetch_schema
 from sandbox.runner import run_python
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+LOG_DIR = Path(__file__).parent.parent / "logs"
+LOG_DIR.mkdir(exist_ok=True)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(LOG_DIR / "backend.log"),
+    ],
+)
 logger = logging.getLogger(__name__)
 
 
