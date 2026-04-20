@@ -349,12 +349,19 @@ button { background: none; border: 0; cursor: pointer; padding: 0; }
 
 /* ── Sidebar ── */
 .sidebar {
-  width: 272px; flex-shrink: 0; display: flex; flex-direction: column;
+  flex-shrink: 0; display: flex; flex-direction: column; position: relative;
   background: var(--bg-1); border-right: 1px solid var(--line-1); overflow: hidden;
 }
 .sidebar-collapsed {
   width: 42px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center;
   background: var(--bg-1); border-right: 1px solid var(--line-1); padding: 6px 0; gap: 4px;
+}
+.sb-resize-handle {
+  position: absolute; top: 0; right: -2px; bottom: 0; width: 5px;
+  cursor: col-resize; z-index: 10;
+}
+.sb-resize-handle:hover, .sb-resize-handle:active {
+  background: var(--acc); opacity: 0.3;
 }
 .sb-head { padding: 8px 10px 6px; border-bottom: 1px solid var(--line-1); }
 .sb-head-row { display: flex; align-items: center; margin-bottom: 6px; }
@@ -405,8 +412,8 @@ button { background: none; border: 0; cursor: pointer; padding: 0; }
 .sb-db-head-wrap { display: flex; align-items: center; }
 .sb-db-head-wrap:hover { background: var(--bg-2); }
 .sb-db-head {
-  display: flex; align-items: center; gap: 6px; flex: 1;
-  padding: 4px 4px 4px 10px; color: var(--tx-2);
+  display: flex; align-items: center; gap: 5px; flex: 1;
+  padding: 4px 8px 4px 12px; color: var(--tx-2);
   font-size: var(--tx-sm); text-align: left; min-width: 0;
 }
 .sb-db-name {
@@ -419,8 +426,8 @@ button { background: none; border: 0; cursor: pointer; padding: 0; }
 .sb-table { display: flex; align-items: stretch; position: relative; }
 .sb-table:hover { background: var(--bg-2); }
 .sb-table-head {
-  display: flex; align-items: center; gap: 6px; flex: 1;
-  padding: 3px 10px 3px 22px; color: var(--tx-2);
+  display: flex; align-items: center; gap: 5px; flex: 1;
+  padding: 3px 8px 3px 30px; color: var(--tx-2);
   font-size: var(--tx-sm); text-align: left;
 }
 .sb-table-name { flex: 1; font-family: var(--font-mono); font-size: 12px; color: var(--tx-1); }
@@ -432,8 +439,8 @@ button { background: none; border: 0; cursor: pointer; padding: 0; }
 .sb-insert:hover { color: var(--acc); }
 .sb-cols { padding-bottom: 4px; }
 .sb-col {
-  display: flex; align-items: center; gap: 6px; width: 100%;
-  padding: 2px 10px 2px 40px; text-align: left;
+  display: flex; align-items: center; gap: 5px; width: 100%;
+  padding: 2px 8px 2px 52px; text-align: left;
   color: var(--tx-2); font-size: var(--tx-sm);
 }
 .sb-col:hover { background: var(--bg-2); color: var(--tx-1); }
