@@ -148,7 +148,8 @@ export function QueryEditor({ tabId, sql: value, onSqlChange, onRun, onSave, isQ
   sqlRef.current = value;
   const editorViewRef = useRef<EditorView | null>(null);
 
-  const handleRun = useCallback(() => {
+  // Cmd+Enter: run statement at cursor position
+  const handleRunAtCursor = useCallback(() => {
     if (!value.trim()) return;
     const view = editorViewRef.current;
     const cursorPos = view ? view.state.selection.main.head : undefined;
@@ -160,8 +161,20 @@ export function QueryEditor({ tabId, sql: value, onSqlChange, onRun, onSave, isQ
     onRun(executed);
   }, [value, onRun]);
 
+  // Cmd+Shift+Enter: run entire editor
   const handleRunAll = useCallback(() => {
     if (value.trim()) onRun(value);
+  }, [value, onRun]);
+
+  // Run button: run selection if any, else entire editor
+  const handleRunButton = useCallback(() => {
+    if (!value.trim()) return;
+    const view = editorViewRef.current;
+    const sel = view?.state.selection.main;
+    const selectionText = (sel && !sel.empty)
+      ? view!.state.sliceDoc(sel.from, sel.to)
+      : undefined;
+    onRun(selectionText?.trim() || value);
   }, [value, onRun]);
 
   // Extensions only depend on schema (not value!) — debounced autocomplete fix
@@ -223,12 +236,14 @@ export function QueryEditor({ tabId, sql: value, onSqlChange, onRun, onSave, isQ
             </button>
           ) : (
             <>
-              <button className="btn btn-primary" onClick={handleRun} title="Run statement at cursor (⌘↵)">
+              <button className="btn btn-primary" onClick={handleRunButton} title="Run selection, or entire editor if nothing selected">
                 <Icons.play size={11} /> Run
-                <span className="kbd" style={{ background: "rgba(255,255,255,.12)", border: "none", color: "rgba(255,255,255,.8)" }}>⌘↵</span>
               </button>
-              <button className="btn-ghost" onClick={handleRunAll} title="Run all (⌘⇧↵)" style={{ fontSize: "var(--tx-xs)", color: "var(--tx-3)" }}>
-                Run All
+              <button className="btn-ghost" onClick={handleRunAtCursor} title="Run statement at cursor (⌘↵)" style={{ fontSize: "var(--tx-xs)", color: "var(--tx-3)" }}>
+                At cursor <span className="kbd">⌘↵</span>
+              </button>
+              <button className="btn-ghost" onClick={handleRunAll} title="Run entire editor (⌘⇧↵)" style={{ fontSize: "var(--tx-xs)", color: "var(--tx-3)" }}>
+                All <span className="kbd">⌘⇧↵</span>
               </button>
               {onSave && value.trim() && (
                 <button className="btn-ghost" onClick={() => onSave(value)} title="Save query" style={{ fontSize: "var(--tx-xs)", color: "var(--tx-3)" }}>
@@ -261,7 +276,7 @@ export function QueryEditor({ tabId, sql: value, onSqlChange, onRun, onSave, isQ
               handleRunAll();
             } else if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
               e.preventDefault();
-              handleRun();
+              handleRunAtCursor();
             } else if ((e.metaKey || e.ctrlKey) && e.key === "s") {
               e.preventDefault();
               if (onSave && value.trim()) onSave(value);

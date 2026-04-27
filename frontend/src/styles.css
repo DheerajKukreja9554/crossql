@@ -524,13 +524,14 @@ button { background: none; border: 0; cursor: pointer; padding: 0; }
   padding: 6px 10px 6px 12px; background: var(--bg-1);
   border-bottom: 1px solid var(--line-1); min-height: 36px;
 }
-.editor-head-left { display: flex; align-items: center; gap: 8px; }
-.editor-head-title { font-size: var(--tx-sm); font-weight: 600; color: var(--tx-1); letter-spacing: -.01em; }
+.editor-head-left { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; }
+.editor-head-title { font-size: var(--tx-sm); font-weight: 600; color: var(--tx-1); letter-spacing: -.01em; flex-shrink: 0; }
 .editor-head-sub {
   font-size: var(--tx-xs); color: var(--tx-3); padding-left: 8px;
   border-left: 1px solid var(--line-2); margin-left: 4px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.editor-head-right { display: flex; align-items: center; gap: 6px; }
+.editor-head-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .vdiv { width: 1px; height: 16px; background: var(--line-2); margin: 0 3px; }
 
 /* Buttons */
