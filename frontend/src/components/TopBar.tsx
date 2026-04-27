@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from "react";
 import { Icons } from "./Icons";
 import type { EnvironmentInfo } from "../api/client";
+import type { QueryTab } from "../store/useAppStore";
 
 interface TopBarProps {
   envId: string | null;
@@ -10,6 +11,13 @@ interface TopBarProps {
   theme: "dark" | "light";
   onToggleTheme: () => void;
   onReloadConfig: () => void;
+  // Tabs
+  tabs: QueryTab[];
+  activeTabId: string;
+  onSetActiveTab: (id: string) => void;
+  onAddTab: () => void;
+  onCloseTab: (id: string) => void;
+  onRenameTab: (id: string, name: string) => void;
 }
 
 function envColor(name: string): string {
@@ -28,9 +36,18 @@ export function TopBar({
   theme,
   onToggleTheme,
   onReloadConfig,
+  tabs,
+  activeTabId,
+  onSetActiveTab,
+  onAddTab,
+  onCloseTab,
+  onRenameTab,
 }: TopBarProps) {
   const [envOpen, setEnvOpen] = useState(false);
+  const [editingTabId, setEditingTabId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
+  const editRef = useRef<HTMLInputElement>(null);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -44,6 +61,21 @@ export function TopBar({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [envOpen]);
 
+  // Focus edit input when editing starts
+  useEffect(() => {
+    if (editingTabId && editRef.current) {
+      editRef.current.focus();
+      editRef.current.select();
+    }
+  }, [editingTabId]);
+
+  const commitRename = () => {
+    if (editingTabId && editName.trim()) {
+      onRenameTab(editingTabId, editName.trim());
+    }
+    setEditingTabId(null);
+  };
+
   const activeEnvInfo = environments.find((e) => e.name === envId);
 
   return (
@@ -51,8 +83,8 @@ export function TopBar({
       <div className="topbar-left">
         {/* Logo */}
         <div className="logo">
-          <span style={{ color: "var(--accent)" }}>
-            <Icons.logo size={20} />
+          <span style={{ color: "var(--acc)" }}>
+            <Icons.logo size={18} />
           </span>
           <span className="logo-text">CrossQL</span>
         </div>
@@ -69,7 +101,11 @@ export function TopBar({
               style={{ background: envId ? envColor(envId) : "var(--env-dev)" }}
             />
             <span className="env-label">{envId ?? "No env"}</span>
-            {activeHost && <span className="env-host">{activeHost}</span>}
+            {activeHost && (
+              <span className="env-host">
+                {activeHost.length > 25 ? activeHost.slice(0, 22) + "..." : activeHost}
+              </span>
+            )}
             <Icons.chev size={12} />
           </button>
 
@@ -85,30 +121,78 @@ export function TopBar({
                     setEnvOpen(false);
                   }}
                 >
-                  <span
-                    className="env-dot"
-                    style={{ background: envColor(env.name) }}
-                  />
+                  <span className="env-dot" style={{ background: envColor(env.name) }} />
                   <span className="env-label">{env.name}</span>
-                  <span className="env-menu-sub">
-                    {env.host}:{env.port}
-                  </span>
+                  <span className="env-menu-sub">{env.host}:{env.port}</span>
                 </button>
               ))}
               <div className="env-menu-foot">
                 {activeEnvInfo && (
-                  <span>
-                    {activeEnvInfo.user}@{activeEnvInfo.host}:{activeEnvInfo.port}
-                  </span>
+                  <span>{activeEnvInfo.user}@{activeEnvInfo.host}:{activeEnvInfo.port}</span>
                 )}
               </div>
             </div>
           )}
         </div>
+
+        {/* Query tabs */}
+        <div className="tabs">
+          {tabs.map((tab) => (
+            <div
+              key={tab.id}
+              className={`tab ${tab.id === activeTabId ? "tab-active" : ""}`}
+              onClick={() => onSetActiveTab(tab.id)}
+              onDoubleClick={() => {
+                setEditingTabId(tab.id);
+                setEditName(tab.name);
+              }}
+            >
+              <span
+                className="tab-dot"
+                style={{ background: tab.dirty ? "var(--warn)" : "var(--tx-4)" }}
+              />
+              {editingTabId === tab.id ? (
+                <input
+                  ref={editRef}
+                  className="tab-edit-input"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  onBlur={commitRename}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") commitRename();
+                    if (e.key === "Escape") setEditingTabId(null);
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <span className="tab-label">{tab.name}</span>
+              )}
+              {tabs.length > 1 && (
+                <button
+                  className="tab-close"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCloseTab(tab.id);
+                  }}
+                  aria-label="Close tab"
+                >
+                  <Icons.close size={10} />
+                </button>
+              )}
+            </div>
+          ))}
+          <button
+            className="tab-add"
+            onClick={onAddTab}
+            title={tabs.length >= 10 ? "Close a tab to open a new one" : "New query tab"}
+            disabled={tabs.length >= 10}
+          >
+            <Icons.plus size={12} />
+          </button>
+        </div>
       </div>
 
       <div className="topbar-right">
-        {/* Theme toggle */}
         <button
           className="icon-btn"
           onClick={onToggleTheme}
@@ -117,7 +201,6 @@ export function TopBar({
           {theme === "dark" ? <Icons.sun size={14} /> : <Icons.moon size={14} />}
         </button>
 
-        {/* Refresh config */}
         <button
           className="btn-ghost"
           onClick={onReloadConfig}

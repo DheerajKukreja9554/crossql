@@ -8,9 +8,9 @@ import { StatusBar } from "./components/StatusBar";
 import { useAppStore } from "./store/useAppStore";
 
 export default function App() {
+  const store = useAppStore();
   const {
     loadEnvironments,
-    runQuery,
     environments,
     activeEnv,
     activeHost,
@@ -20,12 +20,25 @@ export default function App() {
     reloadConfig,
     theme,
     setTheme,
-    queryResult,
-    queryError,
-    isQuerying,
-  } = useAppStore();
+    // Tabs
+    tabs,
+    activeTabId,
+    addTab,
+    closeTab,
+    setActiveTab,
+    updateTabSql,
+    renameTab,
+    queryResults,
+    queryErrors,
+    queryingTabs,
+    runQuery,
+  } = store;
 
-  // Apply initial theme on mount
+  const activeTab = tabs.find(t => t.id === activeTabId);
+  const activeQueryResult = queryResults[activeTabId] ?? null;
+  const activeQueryError = queryErrors[activeTabId] ?? null;
+  const isQuerying = queryingTabs[activeTabId] ?? false;
+
   useEffect(() => {
     const root = document.documentElement;
     root.dataset.theme = theme;
@@ -36,9 +49,15 @@ export default function App() {
     loadEnvironments();
   }, [loadEnvironments]);
 
+  const handleRunQuery = (sql: string) => {
+    runQuery(sql);
+  };
+
   const handleInsertRef = (ref: string) => {
-    // Could integrate with CodeMirror cursor position in the future
-    console.log("Insert reference:", ref);
+    if (activeTab) {
+      const newSql = activeTab.sql + (activeTab.sql.endsWith("\n") || activeTab.sql === "" ? "" : " ") + ref;
+      updateTabSql(activeTabId, newSql);
+    }
   };
 
   return (
@@ -51,6 +70,12 @@ export default function App() {
         theme={theme}
         onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
         onReloadConfig={reloadConfig}
+        tabs={tabs}
+        activeTabId={activeTabId}
+        onSetActiveTab={setActiveTab}
+        onAddTab={addTab}
+        onCloseTab={closeTab}
+        onRenameTab={renameTab}
       />
 
       <div className="app-body">
@@ -65,13 +90,19 @@ export default function App() {
 
         <div className="workspace">
           <div className="ws-sql">
-            <QueryEditor onRun={runQuery} />
+            <QueryEditor
+              tabId={activeTabId}
+              sql={activeTab?.sql ?? ""}
+              onSqlChange={(sql) => updateTabSql(activeTabId, sql)}
+              onRun={handleRunQuery}
+              isQuerying={isQuerying}
+            />
           </div>
           <div className="ws-split" />
           <div className="ws-results">
             <ResultsPanel
-              queryResult={queryResult}
-              queryError={queryError}
+              queryResult={activeQueryResult}
+              queryError={activeQueryError}
               isQuerying={isQuerying}
             />
           </div>

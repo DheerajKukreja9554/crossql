@@ -13,6 +13,8 @@ import {
 const SESSION_KEY = "crossql-session-id";
 const THEME_KEY = "crossql-theme";
 const PALETTE_KEY = "crossql-palette";
+const TABS_KEY = "crossql-tabs";
+const ACTIVE_TAB_KEY = "crossql-active-tab";
 
 function getOrCreateSessionId(): string {
   const existing = localStorage.getItem(SESSION_KEY);
@@ -25,8 +27,55 @@ function getOrCreateSessionId(): string {
 export type Theme = "dark" | "light";
 export type Palette = "default" | "material" | "dracula" | "solarized" | "github" | "nightowl";
 
+// ── Tab types ────────────────────────────────────────────────────────────────
+
+export interface QueryTab {
+  id: string;
+  name: string;
+  sql: string;
+  dirty: boolean;
+  savedQueryId?: string; // linked saved query (for "save" vs "save as")
+}
+
+function createTab(n?: number): QueryTab {
+  return {
+    id: uuidv4(),
+    name: `query_${n ?? 1}.sql`,
+    sql: "",
+    dirty: false,
+  };
+}
+
+function loadTabs(): { tabs: QueryTab[]; activeTabId: string } {
+  try {
+    const raw = localStorage.getItem(TABS_KEY);
+    const activeId = localStorage.getItem(ACTIVE_TAB_KEY);
+    if (raw) {
+      const tabs = JSON.parse(raw) as QueryTab[];
+      if (tabs.length > 0) {
+        return { tabs, activeTabId: activeId && tabs.some(t => t.id === activeId) ? activeId : tabs[0].id };
+      }
+    }
+  } catch { /* ignore */ }
+  const tab = createTab(1);
+  tab.sql = `-- Cross-DB query: use db_name.table notation
+SELECT u.name, o.total, o.status
+FROM users.users u
+JOIN orders.orders o ON u.id = o.user_id
+WHERE o.status = 'paid'
+ORDER BY o.total DESC;`;
+  return { tabs: [tab], activeTabId: tab.id };
+}
+
+function persistTabs(tabs: QueryTab[], activeTabId: string) {
+  localStorage.setItem(TABS_KEY, JSON.stringify(tabs));
+  localStorage.setItem(ACTIVE_TAB_KEY, activeTabId);
+}
+
+// ── Store ────────────────────────────────────────────────────────────────────
+
 interface AppStore {
-  // State
+  // Environment state
   environments: EnvironmentInfo[];
   activeEnv: string | null;
   activeHost: string | null;
@@ -35,10 +84,16 @@ interface AppStore {
   discoveredDbs: string[];
   excludedDbs: string[];
   sessionId: string;
-  queryResult: QueryResult | null;
-  isQuerying: boolean;
-  queryError: AppError | null;
-  pythonResult: PythonResult | null;
+
+  // Tabs
+  tabs: QueryTab[];
+  activeTabId: string;
+  queryResults: Record<string, QueryResult>;  // tabId → result
+  queryErrors: Record<string, AppError>;      // tabId → error
+  queryingTabs: Record<string, boolean>;      // tabId → isQuerying
+
+  // Python
+  pythonResults: Record<string, PythonResult>; // tabId → python result
   isPythonRunning: boolean;
   pythonOpen: boolean;
 
@@ -46,13 +101,24 @@ interface AppStore {
   theme: Theme;
   palette: Palette;
 
-  // Actions
+  // Tab actions
+  addTab: () => void;
+  closeTab: (tabId: string) => void;
+  setActiveTab: (tabId: string) => void;
+  updateTabSql: (tabId: string, sql: string) => void;
+  renameTab: (tabId: string, name: string) => void;
+
+  // Environment actions
   loadEnvironments: () => Promise<void>;
   switchEnv: (env: string) => Promise<void>;
   reloadConfig: () => Promise<void>;
+
+  // Query actions
   runQuery: (sql: string) => Promise<void>;
   runPython: (code: string) => Promise<void>;
   clearQueryError: () => void;
+
+  // Theme actions
   setTheme: (theme: Theme) => void;
   setPalette: (palette: Palette) => void;
   setPythonOpen: (open: boolean) => void;
@@ -66,6 +132,8 @@ function applyTheme(theme: Theme, palette: Palette) {
   localStorage.setItem(PALETTE_KEY, palette);
 }
 
+const initialTabs = loadTabs();
+
 export const useAppStore = create<AppStore>((set, get) => ({
   environments: [],
   activeEnv: null,
@@ -75,22 +143,78 @@ export const useAppStore = create<AppStore>((set, get) => ({
   discoveredDbs: [],
   excludedDbs: [],
   sessionId: getOrCreateSessionId(),
-  queryResult: null,
-  isQuerying: false,
-  queryError: null,
-  pythonResult: null,
+
+  tabs: initialTabs.tabs,
+  activeTabId: initialTabs.activeTabId,
+  queryResults: {},
+  queryErrors: {},
+  queryingTabs: {},
+
+  pythonResults: {},
   isPythonRunning: false,
   pythonOpen: false,
 
   theme: (localStorage.getItem(THEME_KEY) as Theme) || "dark",
   palette: (localStorage.getItem(PALETTE_KEY) as Palette) || "default",
 
+  // ── Tab actions ──────────────────────────────────────────────────────────
+
+  addTab: () => {
+    const { tabs } = get();
+    if (tabs.length >= 10) return;
+    const n = tabs.length + 1;
+    const tab = createTab(n);
+    const newTabs = [...tabs, tab];
+    set({ tabs: newTabs, activeTabId: tab.id });
+    persistTabs(newTabs, tab.id);
+  },
+
+  closeTab: (tabId: string) => {
+    const { tabs, activeTabId } = get();
+    if (tabs.length <= 1) {
+      // Replace with a fresh tab
+      const fresh = createTab(1);
+      set({ tabs: [fresh], activeTabId: fresh.id });
+      persistTabs([fresh], fresh.id);
+      return;
+    }
+    const idx = tabs.findIndex(t => t.id === tabId);
+    const newTabs = tabs.filter(t => t.id !== tabId);
+    let newActiveId = activeTabId;
+    if (activeTabId === tabId) {
+      newActiveId = newTabs[Math.min(idx, newTabs.length - 1)].id;
+    }
+    set({ tabs: newTabs, activeTabId: newActiveId });
+    persistTabs(newTabs, newActiveId);
+  },
+
+  setActiveTab: (tabId: string) => {
+    set({ activeTabId: tabId });
+    localStorage.setItem(ACTIVE_TAB_KEY, tabId);
+  },
+
+  updateTabSql: (tabId: string, sql: string) => {
+    const newTabs = get().tabs.map(t =>
+      t.id === tabId ? { ...t, sql, dirty: true } : t
+    );
+    set({ tabs: newTabs });
+    persistTabs(newTabs, get().activeTabId);
+  },
+
+  renameTab: (tabId: string, name: string) => {
+    const newTabs = get().tabs.map(t =>
+      t.id === tabId ? { ...t, name } : t
+    );
+    set({ tabs: newTabs });
+    persistTabs(newTabs, get().activeTabId);
+  },
+
+  // ── Environment actions ──────────────────────────────────────────────────
+
   loadEnvironments: async () => {
     try {
       const res = await api.getEnvironments();
       set({ environments: res.environments });
-
-      // Auto-switch to active env or first env
       const targetEnv = res.active || res.environments[0]?.name;
       if (targetEnv && !get().activeEnv) {
         await get().switchEnv(targetEnv);
@@ -110,9 +234,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
         schema: res.db_schema,
         discoveredDbs: res.discovered_dbs,
         excludedDbs: res.excluded_dbs,
-        queryResult: null,
-        queryError: null,
-        pythonResult: null,
+        queryResults: {},
+        queryErrors: {},
+        pythonResults: {},
       });
     } catch (err) {
       console.error("Failed to switch environment:", err);
@@ -130,7 +254,6 @@ export const useAppStore = create<AppStore>((set, get) => ({
         discoveredDbs: res.discovered_dbs,
         excludedDbs: res.excluded_dbs,
       });
-      // Reload environments list too
       const envRes = await api.getEnvironments();
       set({ environments: envRes.environments });
     } catch (err) {
@@ -138,37 +261,68 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }
   },
 
+  // ── Query actions ────────────────────────────────────────────────────────
+
   runQuery: async (sql: string) => {
-    set({ isQuerying: true, queryError: null, queryResult: null, pythonResult: null });
+    const { activeTabId, sessionId } = get();
+    const compositeSession = `${sessionId}:${activeTabId}`;
+
+    set(s => ({
+      queryingTabs: { ...s.queryingTabs, [activeTabId]: true },
+      queryErrors: { ...s.queryErrors, [activeTabId]: undefined as unknown as AppError },
+      queryResults: { ...s.queryResults, [activeTabId]: undefined as unknown as QueryResult },
+      pythonResults: { ...s.pythonResults, [activeTabId]: undefined as unknown as PythonResult },
+    }));
+
     try {
-      const result = await api.runQuery(sql, get().sessionId);
+      const result = await api.runQuery(sql, compositeSession);
       if ("code" in result) {
-        set({ queryError: result as AppError, isQuerying: false });
+        set(s => ({
+          queryErrors: { ...s.queryErrors, [activeTabId]: result as AppError },
+          queryingTabs: { ...s.queryingTabs, [activeTabId]: false },
+        }));
         return;
       }
-      set({ queryResult: result as QueryResult, isQuerying: false });
+      set(s => ({
+        queryResults: { ...s.queryResults, [activeTabId]: result as QueryResult },
+        queryingTabs: { ...s.queryingTabs, [activeTabId]: false },
+      }));
     } catch (err: unknown) {
       const appErr = (err && typeof err === "object" && "code" in err)
         ? err as AppError
         : { error: String(err), detail: "", code: "CONNECTION_ERROR" as const };
-      set({ queryError: appErr, isQuerying: false });
+      set(s => ({
+        queryErrors: { ...s.queryErrors, [activeTabId]: appErr },
+        queryingTabs: { ...s.queryingTabs, [activeTabId]: false },
+      }));
     }
   },
 
   runPython: async (code: string) => {
-    set({ isPythonRunning: true, pythonResult: null });
+    const { activeTabId, sessionId } = get();
+    const compositeSession = `${sessionId}:${activeTabId}`;
+
+    set({ isPythonRunning: true });
     try {
-      const result = await api.runPython(code, get().sessionId);
-      set({ pythonResult: result, isPythonRunning: false });
-    } catch (err) {
-      set({
-        pythonResult: { output: "", error: String(err) },
+      const result = await api.runPython(code, compositeSession);
+      set(s => ({
+        pythonResults: { ...s.pythonResults, [activeTabId]: result },
         isPythonRunning: false,
-      });
+      }));
+    } catch (err) {
+      set(s => ({
+        pythonResults: { ...s.pythonResults, [activeTabId]: { output: "", error: String(err) } },
+        isPythonRunning: false,
+      }));
     }
   },
 
-  clearQueryError: () => set({ queryError: null }),
+  clearQueryError: () => {
+    const { activeTabId } = get();
+    set(s => ({
+      queryErrors: { ...s.queryErrors, [activeTabId]: undefined as unknown as AppError },
+    }));
+  },
 
   setTheme: (theme: Theme) => {
     set({ theme });

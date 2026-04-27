@@ -14,20 +14,23 @@ print(df.describe())
 export function PythonCell() {
   const {
     runPython,
-    pythonResult,
     isPythonRunning,
-    queryResult,
     pythonOpen,
     setPythonOpen,
     theme,
+    activeTabId,
+    queryResults,
+    pythonResults,
   } = useAppStore();
   const [code, setCode] = useState(DEFAULT_PYTHON);
+
+  const queryResult = queryResults[activeTabId] ?? null;
+  const pythonResult = pythonResults[activeTabId] ?? null;
+  const hasData = queryResult !== null;
 
   const handleRun = useCallback(() => {
     if (code.trim()) runPython(code);
   }, [code, runPython]);
-
-  const hasData = queryResult !== null;
 
   return (
     <div className="py-wrap">
@@ -36,41 +39,27 @@ export function PythonCell() {
           <button
             onClick={() => setPythonOpen(!pythonOpen)}
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              color: "var(--tx-2)",
-              cursor: "pointer",
-              background: "none",
-              border: "none",
+              display: "flex", alignItems: "center", gap: 8,
+              color: "var(--tx-2)", cursor: "pointer", background: "none", border: "none",
             }}
           >
-            <span
-              style={{
-                color: "var(--sx-db)",
-                transform: pythonOpen ? "rotate(90deg)" : "none",
-                transition: "transform 0.15s",
-                display: "inline-flex",
-              }}
-            >
+            <span style={{
+              color: "var(--sx-db)",
+              transform: pythonOpen ? "rotate(90deg)" : "none",
+              transition: "transform 0.15s", display: "inline-flex",
+            }}>
               <Icons.chevRight size={10} />
             </span>
-            <span style={{ color: "var(--sx-db)" }}>
-              <Icons.python size={13} />
-            </span>
+            <span style={{ color: "var(--sx-db)" }}><Icons.python size={13} /></span>
             <span className="editor-head-title">Python cell</span>
           </button>
           {hasData && queryResult && (
             <span className="editor-head-sub">
-              <span className="mono" style={{ color: "var(--sx-db)" }}>
-                df
-              </span>
+              <span className="mono" style={{ color: "var(--sx-db)" }}>df</span>
               {Object.keys(queryResult.timing.per_db).map((db) => (
                 <span key={db}>
                   <span style={{ color: "var(--tx-4)" }}> · </span>
-                  <span className="mono" style={{ color: "var(--sx-db)" }}>
-                    df_{db}
-                  </span>
+                  <span className="mono" style={{ color: "var(--sx-db)" }}>df_{db}</span>
                 </span>
               ))}
             </span>
@@ -85,22 +74,9 @@ export function PythonCell() {
               disabled={isPythonRunning || !hasData}
               style={{ padding: "4px 10px", fontSize: "var(--tx-sm)" }}
             >
-              {isPythonRunning ? (
-                <Icons.spinner size={10} />
-              ) : (
-                <Icons.play size={10} />
-              )}
+              {isPythonRunning ? <Icons.spinner size={10} /> : <Icons.play size={10} />}
               Run
-              <span
-                className="kbd"
-                style={{
-                  background: "rgba(255,255,255,.12)",
-                  border: "none",
-                  color: "rgba(255,255,255,.8)",
-                }}
-              >
-                ⇧↵
-              </span>
+              <span className="kbd" style={{ background: "rgba(255,255,255,.12)", border: "none", color: "rgba(255,255,255,.8)" }}>⇧↵</span>
             </button>
           )}
         </div>
@@ -114,21 +90,10 @@ export function PythonCell() {
               onChange={setCode}
               extensions={[python()]}
               theme={theme === "dark" ? oneDark : undefined}
-              basicSetup={{
-                lineNumbers: true,
-                foldGutter: false,
-                highlightActiveLineGutter: true,
-              }}
-              style={{
-                fontSize: "12.5px",
-                fontFamily: "var(--font-mono)",
-              }}
+              basicSetup={{ lineNumbers: true, foldGutter: false, highlightActiveLineGutter: true }}
+              style={{ fontSize: "12.5px", fontFamily: "var(--font-mono)" }}
               onKeyDown={(e) => {
-                if (
-                  (e.metaKey || e.ctrlKey) &&
-                  e.shiftKey &&
-                  e.key === "Enter"
-                ) {
+                if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "Enter") {
                   e.preventDefault();
                   handleRun();
                 }
@@ -139,12 +104,8 @@ export function PythonCell() {
           {pythonResult && (
             <div className="py-out">
               <div className="py-out-head">
-                <span className="mono" style={{ color: "var(--tx-4)" }}>
-                  Output:
-                </span>
-                {pythonResult.error && (
-                  <span style={{ color: "var(--err)" }}>Error</span>
-                )}
+                <span className="mono" style={{ color: "var(--tx-4)" }}>Output:</span>
+                {pythonResult.error && <span style={{ color: "var(--err)" }}>Error</span>}
               </div>
               {pythonResult.error ? (
                 <div className="py-output-error">{pythonResult.error}</div>

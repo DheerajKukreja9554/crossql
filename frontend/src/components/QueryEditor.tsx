@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { sql, PostgreSQL } from "@codemirror/lang-sql";
 import { oneDark } from "@codemirror/theme-one-dark";
@@ -13,35 +13,25 @@ import { Prec } from "@codemirror/state";
 import { Icons } from "./Icons";
 import { useAppStore } from "../store/useAppStore";
 import type { SchemaCache } from "../api/client";
-
-const DEFAULT_SQL = `-- Cross-DB query: use db_name.table notation
-SELECT u.name, o.total, o.status
-FROM users.users u
-JOIN orders.orders o ON u.id = o.user_id
-WHERE o.status = 'paid'
-ORDER BY o.total DESC;`;
+import { getStatementAtCursor } from "../lib/statementAtCursor";
 
 interface QueryEditorProps {
+  tabId: string;
+  sql: string;
+  onSqlChange: (sql: string) => void;
   onRun: (sql: string) => void;
+  isQuerying: boolean;
 }
 
-/**
- * Parse SQL text to extract alias → (db, table) mappings.
- * Matches patterns like:
- *   FROM db.table alias
- *   FROM db.table AS alias
- *   JOIN db.table alias
- *   JOIN db.table AS alias
- */
+// ── Alias parsing ────────────────────────────────────────────────────────────
+
 function parseAliases(sqlText: string): Map<string, { db: string; table: string }> {
   const aliases = new Map<string, { db: string; table: string }>();
-  // Match: FROM/JOIN db.table [AS] alias
   const re = /(?:FROM|JOIN)\s+(\w+)\.(\w+)\s+(?:AS\s+)?(\w+)/gi;
   let m: RegExpExecArray | null;
+  const kw = new Set(["ON", "WHERE", "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "FULL", "CROSS", "GROUP", "ORDER", "LIMIT", "HAVING", "UNION", "SET"]);
   while ((m = re.exec(sqlText)) !== null) {
     const [, db, table, alias] = m;
-    // Skip SQL keywords that might follow table refs
-    const kw = new Set(["ON", "WHERE", "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "FULL", "CROSS", "GROUP", "ORDER", "LIMIT", "HAVING", "UNION", "SET"]);
     if (!kw.has(alias.toUpperCase())) {
       aliases.set(alias.toLowerCase(), { db: db.toLowerCase(), table: table.toLowerCase() });
     }
@@ -49,11 +39,9 @@ function parseAliases(sqlText: string): Map<string, { db: string; table: string 
   return aliases;
 }
 
-/** Build a custom autocomplete source that understands db.table, aliases, and columns */
-function buildCompletionSource(schema: SchemaCache, sqlText: string) {
-  const aliases = parseAliases(sqlText);
+// ── Autocomplete ─────────────────────────────────────────────────────────────
 
-  // Build a case-insensitive lookup for schema
+function buildCompletionSource(schema: SchemaCache, sqlRef: React.RefObject<string>) {
   const schemaLower: Record<string, Record<string, string[]>> = {};
   for (const [db, tables] of Object.entries(schema)) {
     schemaLower[db.toLowerCase()] = {};
@@ -66,45 +54,27 @@ function buildCompletionSource(schema: SchemaCache, sqlText: string) {
     const word = context.matchBefore(/[\w.]*/);
     if (!word || (word.from === word.to && !context.explicit)) return null;
 
+    // Parse aliases from current SQL text (read from ref, not from dependency)
+    const aliases = parseAliases(sqlRef.current ?? "");
+
     const text = word.text;
     const parts = text.split(".");
     const options: { label: string; type: string; detail?: string; boost?: number }[] = [];
 
     if (parts.length === 1) {
       const prefix = parts[0].toLowerCase();
-
-      // Suggest database names
       for (const dbName of Object.keys(schema)) {
-        if (!prefix || dbName.toLowerCase().startsWith(prefix)) {
+        if (!prefix || dbName.toLowerCase().startsWith(prefix))
           options.push({ label: dbName, type: "keyword", detail: "database", boost: 3 });
-        }
       }
-
-      // Suggest known aliases
       for (const [alias, ref] of aliases) {
-        if (!prefix || alias.startsWith(prefix)) {
-          options.push({
-            label: alias,
-            type: "variable",
-            detail: `alias → ${ref.db}.${ref.table}`,
-            boost: 4,
-          });
-        }
+        if (!prefix || alias.startsWith(prefix))
+          options.push({ label: alias, type: "variable", detail: `→ ${ref.db}.${ref.table}`, boost: 4 });
       }
-
-      // Suggest db.table for quick access
       for (const [dbName, tables] of Object.entries(schema)) {
-        for (const tableName of Object.keys(tables)) {
-          options.push({
-            label: `${dbName}.${tableName}`,
-            type: "class",
-            detail: `table in ${dbName}`,
-            boost: 1,
-          });
-        }
+        for (const tableName of Object.keys(tables))
+          options.push({ label: `${dbName}.${tableName}`, type: "class", detail: `table in ${dbName}`, boost: 1 });
       }
-
-      // Suggest all column names globally (low priority)
       const seenCols = new Set<string>();
       for (const tables of Object.values(schema)) {
         for (const [tableName, cols] of Object.entries(tables)) {
@@ -118,66 +88,49 @@ function buildCompletionSource(schema: SchemaCache, sqlText: string) {
       }
     } else if (parts.length === 2) {
       const first = parts[0].toLowerCase();
-
-      // Check if first part is an alias
       const aliasRef = aliases.get(first);
       if (aliasRef) {
         const cols = schemaLower[aliasRef.db]?.[aliasRef.table];
-        if (cols) {
-          for (const col of cols) {
-            options.push({
-              label: col,
-              type: "property",
-              detail: `${aliasRef.db}.${aliasRef.table}`,
-              boost: 3,
-            });
-          }
-        }
+        if (cols) for (const col of cols)
+          options.push({ label: col, type: "property", detail: `${aliasRef.db}.${aliasRef.table}`, boost: 3 });
       }
-
-      // Check if first part is a database name → suggest tables
       const tables = schemaLower[first];
-      if (tables) {
-        for (const [tableName, cols] of Object.entries(tables)) {
-          options.push({ label: tableName, type: "class", detail: `${cols.length} columns`, boost: 2 });
-        }
-      }
+      if (tables) for (const [tableName, cols] of Object.entries(tables))
+        options.push({ label: tableName, type: "class", detail: `${cols.length} columns`, boost: 2 });
     } else if (parts.length === 3) {
-      // db.table.column
-      const dbName = parts[0].toLowerCase();
-      const tableName = parts[1].toLowerCase();
-      const cols = schemaLower[dbName]?.[tableName];
-      if (cols) {
-        for (const col of cols) {
-          options.push({ label: col, type: "property", detail: `column in ${tableName}`, boost: 2 });
-        }
-      }
+      const cols = schemaLower[parts[0].toLowerCase()]?.[parts[1].toLowerCase()];
+      if (cols) for (const col of cols)
+        options.push({ label: col, type: "property", detail: `column in ${parts[1]}`, boost: 2 });
     }
 
     if (options.length === 0) return null;
-
-    const from = parts.length > 1
-      ? word.from + text.lastIndexOf(".") + 1
-      : word.from;
-
+    const from = parts.length > 1 ? word.from + text.lastIndexOf(".") + 1 : word.from;
     return { from, options, validFor: /^[\w]*$/ };
   };
 }
 
-export function QueryEditor({ onRun }: QueryEditorProps) {
-  const { isQuerying, schema, theme } = useAppStore();
-  const [value, setValue] = useState(DEFAULT_SQL);
+// ── Component ────────────────────────────────────────────────────────────────
+
+export function QueryEditor({ tabId, sql: value, onSqlChange, onRun, isQuerying }: QueryEditorProps) {
+  const { schema, theme } = useAppStore();
+  const sqlRef = useRef(value);
+  sqlRef.current = value;
 
   const handleRun = useCallback(() => {
+    if (!value.trim()) return;
+    // Try to get cursor position from CodeMirror
+    // For now, run the full statement detection
+    const executed = getStatementAtCursor(value, undefined);
+    onRun(executed);
+  }, [value, onRun]);
+
+  const handleRunAll = useCallback(() => {
     if (value.trim()) onRun(value);
   }, [value, onRun]);
 
-  // Build CodeMirror extensions with alias-aware autocomplete + Tab to accept
+  // Extensions only depend on schema (not value!) — debounced autocomplete fix
   const extensions = useMemo(() => {
-    const completionSource = buildCompletionSource(schema, value);
-
-    // Keep all default completion keybindings (ArrowUp/Down, Escape, etc.)
-    // but replace Enter with Tab for accepting
+    const completionSource = buildCompletionSource(schema, sqlRef);
     const customCompletionKeymap = completionKeymap
       .filter((k) => k.key !== "Enter")
       .concat([{ key: "Tab", run: acceptCompletion }]);
@@ -192,9 +145,8 @@ export function QueryEditor({ onRun }: QueryEditorProps) {
       }),
       Prec.highest(keymap.of(customCompletionKeymap)),
     ];
-  }, [schema, value]);
+  }, [schema]); // NO dependency on value — fixed perf issue
 
-  // Count referenced databases from the SQL
   const dbNames = Object.keys(schema);
   const referencedDbs = dbNames.filter((db) =>
     value.toLowerCase().includes(db.toLowerCase() + ".")
@@ -204,23 +156,16 @@ export function QueryEditor({ onRun }: QueryEditorProps) {
     <div className="editor-wrap">
       <div className="editor-head">
         <div className="editor-head-left">
-          <span style={{ color: "var(--tx-3)" }}>
-            <Icons.code size={13} />
-          </span>
+          <span style={{ color: "var(--tx-3)" }}><Icons.code size={13} /></span>
           <span className="editor-head-title">SQL</span>
           {referencedDbs.length > 0 && (
             <span className="editor-head-sub">
               <span style={{ color: "var(--sx-db)" }}>
-                {referencedDbs.length} database
-                {referencedDbs.length !== 1 ? "s" : ""} referenced
+                {referencedDbs.length} DB{referencedDbs.length !== 1 ? "s" : ""}
               </span>
               <span style={{ color: "var(--tx-4)", marginLeft: 8 }}>
-                ·{" "}
-                {referencedDbs.map((db, i) => (
-                  <span key={db}>
-                    {i > 0 && ", "}
-                    <span style={{ color: "var(--sx-db)" }}>{db}</span>
-                  </span>
+                · {referencedDbs.map((db, i) => (
+                  <span key={db}>{i > 0 && ", "}<span style={{ color: "var(--sx-db)" }}>{db}</span></span>
                 ))}
               </span>
             </span>
@@ -233,42 +178,38 @@ export function QueryEditor({ onRun }: QueryEditorProps) {
               <Icons.stop size={10} /> Cancel
             </button>
           ) : (
-            <button className="btn btn-primary" onClick={handleRun}>
-              <Icons.play size={11} /> Run
-              <span
-                className="kbd"
-                style={{
-                  background: "rgba(255,255,255,.12)",
-                  border: "none",
-                  color: "rgba(255,255,255,.8)",
-                }}
-              >
-                ⌘↵
-              </span>
-            </button>
+            <>
+              <button className="btn btn-primary" onClick={handleRun} title="Run statement at cursor (⌘↵)">
+                <Icons.play size={11} /> Run
+                <span className="kbd" style={{ background: "rgba(255,255,255,.12)", border: "none", color: "rgba(255,255,255,.8)" }}>⌘↵</span>
+              </button>
+              <button className="btn-ghost" onClick={handleRunAll} title="Run all (⌘⇧↵)" style={{ fontSize: "var(--tx-xs)", color: "var(--tx-3)" }}>
+                Run All
+              </button>
+            </>
           )}
         </div>
       </div>
 
       <div className="editor-body">
         <CodeMirror
+          key={tabId}
           value={value}
-          onChange={setValue}
+          onChange={onSqlChange}
           extensions={extensions}
           theme={theme === "dark" ? oneDark : undefined}
           basicSetup={{
             lineNumbers: true,
             foldGutter: false,
             highlightActiveLineGutter: true,
-            autocompletion: false, // handled by our extensions
+            autocompletion: false,
           }}
-          style={{
-            height: "100%",
-            fontSize: "12.5px",
-            fontFamily: "var(--font-mono)",
-          }}
+          style={{ height: "100%", fontSize: "12.5px", fontFamily: "var(--font-mono)" }}
           onKeyDown={(e) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+            if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "Enter") {
+              e.preventDefault();
+              handleRunAll();
+            } else if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
               e.preventDefault();
               handleRun();
             }

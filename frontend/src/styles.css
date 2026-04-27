@@ -287,6 +287,12 @@ button { background: none; border: 0; cursor: pointer; padding: 0; }
   width: 24px; height: 24px; border-radius: var(--r-sm); color: var(--tx-3); margin-left: 4px;
 }
 .tab-add:hover { background: var(--bg-2); color: var(--tx-1); }
+.tab-add:disabled { opacity: 0.3; cursor: not-allowed; }
+.tab-edit-input {
+  background: var(--bg-input); border: 1px solid var(--acc); border-radius: 3px;
+  padding: 0 4px; font-size: var(--tx-sm); color: var(--tx-1);
+  width: 100px; outline: none; font-family: var(--font-sans);
+}
 
 /* Search button */
 .search-btn {
