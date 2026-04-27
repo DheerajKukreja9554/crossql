@@ -8,7 +8,7 @@ import {
   completionKeymap,
 } from "@codemirror/autocomplete";
 import type { CompletionContext, CompletionResult } from "@codemirror/autocomplete";
-import { keymap } from "@codemirror/view";
+import { keymap, EditorView } from "@codemirror/view";
 import { Prec } from "@codemirror/state";
 import { Icons } from "./Icons";
 import { useAppStore } from "../store/useAppStore";
@@ -38,6 +38,34 @@ function parseAliases(sqlText: string): Map<string, { db: string; table: string 
     }
   }
   return aliases;
+}
+
+// ── SQL keyword completions ──────────────────────────────────────────────────
+
+const SQL_KEYWORDS = [
+  "SELECT", "FROM", "WHERE", "JOIN", "LEFT JOIN", "RIGHT JOIN", "INNER JOIN",
+  "FULL OUTER JOIN", "CROSS JOIN", "ON", "GROUP BY", "ORDER BY", "HAVING",
+  "LIMIT", "OFFSET", "DISTINCT", "AS", "AND", "OR", "NOT", "IN", "NOT IN",
+  "EXISTS", "LIKE", "ILIKE", "BETWEEN", "IS NULL", "IS NOT NULL", "TRUE", "FALSE",
+  "INSERT INTO", "VALUES", "UPDATE", "SET", "DELETE FROM", "RETURNING",
+  "WITH", "UNION", "UNION ALL", "EXCEPT", "INTERSECT",
+  "CASE", "WHEN", "THEN", "ELSE", "END",
+  "COUNT", "SUM", "AVG", "MIN", "MAX", "COALESCE", "NULLIF", "CAST",
+  "EXTRACT", "DATE_TRUNC", "NOW", "CURRENT_DATE", "CURRENT_TIMESTAMP",
+  "STRING_AGG", "ARRAY_AGG", "JSON_AGG", "ROW_NUMBER", "RANK", "DENSE_RANK",
+  "PARTITION BY", "OVER",
+];
+
+function buildKeywordCompletionSource(context: CompletionContext): CompletionResult | null {
+  const word = context.matchBefore(/\w*/);
+  if (!word || (word.from === word.to && !context.explicit)) return null;
+  if (!context.explicit && word.text.length < 2) return null;
+  const prefix = word.text.toUpperCase();
+  const options = SQL_KEYWORDS
+    .filter(k => k.startsWith(prefix))
+    .map(k => ({ label: k, type: "keyword" as const, boost: -1 }));
+  if (options.length === 0) return null;
+  return { from: word.from, options };
 }
 
 // ── Autocomplete ─────────────────────────────────────────────────────────────
@@ -138,10 +166,18 @@ export function QueryEditor({ tabId, sql: value, onSqlChange, onRun, onSave, isQ
       .filter((k) => k.key !== "Enter")
       .concat([{ key: "Tab", run: acceptCompletion }]);
 
+    const selectionTheme = EditorView.theme({
+      "&.cm-focused .cm-selectionBackground, .cm-selectionBackground": {
+        background: "rgba(108,142,245,0.35)",
+      },
+      "&.cm-focused": { outline: "none" },
+    });
+
     return [
       sql({ dialect: PostgreSQL, upperCaseKeywords: true }),
+      selectionTheme,
       autocompletion({
-        override: [completionSource],
+        override: [completionSource, buildKeywordCompletionSource],
         activateOnTyping: true,
         maxRenderedOptions: 20,
         defaultKeymap: false,

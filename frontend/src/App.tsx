@@ -44,6 +44,10 @@ export default function App() {
 
   const [manageConnectionsOpen, setManageConnectionsOpen] = useState(false);
   const [closeConfirmTab, setCloseConfirmTab] = useState<{ id: string; name: string; sql: string } | null>(null);
+  // Save dialog: { sql, tabName, onSaved? (called after save completes) }
+  const [saveDialog, setSaveDialog] = useState<{ sql: string; tabName: string; onSaved?: () => void } | null>(null);
+  const [saveDialogName, setSaveDialogName] = useState("");
+  const [saveDialogSaving, setSaveDialogSaving] = useState(false);
 
   const activeTab = tabs.find(t => t.id === activeTabId);
   const activeQueryResult = queryResults[activeTabId] ?? null;
@@ -73,20 +77,27 @@ export default function App() {
     closeTab(tabId);
   };
 
+  const openSaveDialog = (sql: string, tabName: string, onSaved?: () => void) => {
+    setSaveDialogName(tabName.replace(".sql", ""));
+    setSaveDialog({ sql, tabName, onSaved });
+    setSaveDialogSaving(false);
+  };
+
   const handleSaveAndClose = (tab: { id: string; name: string; sql: string }) => {
-    const name = prompt("Save query as:", tab.name.replace(".sql", ""));
-    if (name?.trim()) {
-      saveQuery(name.trim(), tab.sql)
-        .then(() => { closeTab(tab.id); setCloseConfirmTab(null); })
-        .catch(console.error);
-    }
+    openSaveDialog(tab.sql, tab.name, () => { closeTab(tab.id); setCloseConfirmTab(null); });
   };
 
   const handleSaveQuery = (sql: string) => {
-    const name = prompt("Save query as:", activeTab?.name ?? "My Query");
-    if (name?.trim()) {
-      saveQuery(name.trim(), sql).catch(console.error);
-    }
+    openSaveDialog(sql, activeTab?.name ?? "query");
+  };
+
+  const handleSaveDialogConfirm = () => {
+    if (!saveDialog || !saveDialogName.trim()) return;
+    setSaveDialogSaving(true);
+    saveQuery(saveDialogName.trim(), saveDialog.sql)
+      .then(() => { saveDialog.onSaved?.(); setSaveDialog(null); })
+      .catch(console.error)
+      .finally(() => setSaveDialogSaving(false));
   };
 
   const handleInsertRef = (ref: string) => {
@@ -162,7 +173,7 @@ export default function App() {
         <ManageConnectionsModal onClose={() => setManageConnectionsOpen(false)} />
       )}
 
-      {closeConfirmTab && (
+      {closeConfirmTab && !saveDialog && (
         <div className="modal-overlay" onClick={() => setCloseConfirmTab(null)}>
           <div className="modal" style={{ width: 380 }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
@@ -182,6 +193,47 @@ export default function App() {
                 </button>
                 <button className="btn btn-primary" onClick={() => handleSaveAndClose(closeConfirmTab)}>
                   Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {saveDialog && (
+        <div className="modal-overlay" onClick={() => setSaveDialog(null)}>
+          <div className="modal" style={{ width: 380 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <div className="modal-title">Save query</div>
+                <div className="modal-subtitle">Saves to the Queries panel in the sidebar</div>
+              </div>
+              <button className="modal-close" onClick={() => setSaveDialog(null)}>✕</button>
+            </div>
+            <div className="modal-body" style={{ padding: "14px 20px" }}>
+              <div className="conn-field">
+                <div className="conn-field-label">Name</div>
+                <input
+                  className="conn-input"
+                  autoFocus
+                  value={saveDialogName}
+                  onChange={e => setSaveDialogName(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") handleSaveDialogConfirm(); if (e.key === "Escape") setSaveDialog(null); }}
+                  placeholder="My query"
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <div />
+              <div className="modal-footer-right">
+                <button className="btn btn-ghost" onClick={() => setSaveDialog(null)}>Cancel</button>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleSaveDialogConfirm}
+                  disabled={!saveDialogName.trim() || saveDialogSaving}
+                  style={{ opacity: !saveDialogName.trim() ? .5 : 1 }}
+                >
+                  {saveDialogSaving ? "Saving..." : "Save"}
                 </button>
               </div>
             </div>

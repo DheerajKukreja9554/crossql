@@ -377,8 +377,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   openQueryInTab: (sql: string, name?: string) => {
     const { tabs, activeTabId, addTab } = get();
     const currentTab = tabs.find(t => t.id === activeTabId);
-    // Reuse current tab if it's empty and clean
-    if (currentTab && !currentTab.dirty && !currentTab.sql.trim()) {
+    // Reuse current tab if user hasn't edited it (dirty flag not set)
+    if (currentTab && !currentTab.dirty) {
       const newTabs = tabs.map(t =>
         t.id === activeTabId ? { ...t, sql, name: name ?? t.name, dirty: false } : t
       );
