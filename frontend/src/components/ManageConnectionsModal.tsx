@@ -23,6 +23,9 @@ export function ManageConnectionsModal({ onClose }: ManageConnectionsModalProps)
   // Delete confirm state: envName that is pending confirm
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
+  // Delete error feedback
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   async function fetchConnections() {
     setLoading(true);
     setLoadError(null);
@@ -53,13 +56,14 @@ export function ManageConnectionsModal({ onClose }: ManageConnectionsModalProps)
   }
 
   async function handleDelete(envName: string) {
+    setDeleteError(null);
     try {
       await api.deleteConnection(envName);
       await reloadConfig();
       setDeleteConfirm(null);
       await fetchConnections();
     } catch (e: unknown) {
-      // Silently re-fetch; active-env guard is visual so this shouldn't happen
+      setDeleteError(`Failed to delete ${envName}. Please try again.`);
       await fetchConnections();
     }
   }
@@ -129,7 +133,7 @@ export function ManageConnectionsModal({ onClose }: ManageConnectionsModalProps)
                         <button className="reauth-btn" onClick={() => handleUnlock(conn.name)} disabled={reauth[conn.name]?.submitting}>
                           {reauth[conn.name]?.submitting ? "..." : "Unlock"}
                         </button>
-                        {reauth[conn.name]?.error && <span className="reauth-error">{reauth[conn.name].error}</span>}
+                        {reauth[conn.name]?.error && <span className="reauth-error">{reauth[conn.name]?.error}</span>}
                       </div>
                     )}
 
@@ -151,6 +155,9 @@ export function ManageConnectionsModal({ onClose }: ManageConnectionsModalProps)
                   </div>
                 </div>
               ))}
+              {deleteError && (
+                <div style={{ fontSize: 12, color: "var(--err)", padding: "4px 0" }}>{deleteError}</div>
+              )}
               {!loading && !loadError && (
                 <button className="conn-add-btn" onClick={() => setView("add")}>
                   <Icons.plus size={14} /> Add environment
@@ -258,6 +265,7 @@ function ConnectionForm({ mode, initial, onSaved, onCancel }: ConnectionFormProp
           exclude_databases: excluded,
         });
       } else {
+        if (!initial) return;
         const patch: Record<string, unknown> = {
           host: host.trim(),
           port: Number(port) || 5432,
@@ -265,7 +273,7 @@ function ConnectionForm({ mode, initial, onSaved, onCancel }: ConnectionFormProp
           exclude_databases: excluded,
         };
         if (password.trim()) patch.password = password;
-        await api.updateConnection(initial!.name, patch as Parameters<typeof api.updateConnection>[1]);
+        await api.updateConnection(initial.name, patch as Parameters<typeof api.updateConnection>[1]);
       }
       await onSaved();
     } catch (e: unknown) {
