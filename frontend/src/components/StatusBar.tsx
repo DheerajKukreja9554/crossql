@@ -1,16 +1,17 @@
 import { useAppStore } from "../store/useAppStore";
 
 export function StatusBar() {
-  const { activeEnv, activeHost, dbStatus } = useAppStore();
-  const okCount = Object.values(dbStatus).filter((s) => s === "ok").length;
-  const totalCount = Object.keys(dbStatus).length;
+  const { activeEnv, activeHost, dbStatus, discoveredDbs } = useAppStore();
+  const connectedCount = Object.values(dbStatus).filter((s) => s === "ok").length;
+  const discoveredCount = discoveredDbs.length;
 
   return (
     <div className="statusbar">
       <div className="sb-left">
-        <span className={`dot ${okCount === totalCount ? "ok" : "warn"}`} />
+        <span className={`dot ${connectedCount > 0 ? "ok" : "warn"}`} />
         <span>
-          {totalCount} DB{totalCount !== 1 ? "s" : ""} · {okCount} healthy
+          {discoveredCount} discovered
+          {connectedCount > 0 && ` · ${connectedCount} connected`}
         </span>
         <span className="sb-sep">·</span>
         <span>{activeEnv || "no env"}</span>

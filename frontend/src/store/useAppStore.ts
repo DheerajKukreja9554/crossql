@@ -19,6 +19,17 @@ const ACTIVE_TAB_KEY = "crossql-active-tab";
 const HISTORY_KEY = "crossql-history";
 const MAX_HISTORY = 50;
 
+function schemaKey(env: string) { return `crossql-schema-${env}`; }
+function loadCachedSchema(env: string): SchemaCache | null {
+  try {
+    const raw = localStorage.getItem(schemaKey(env));
+    return raw ? (JSON.parse(raw) as SchemaCache) : null;
+  } catch { return null; }
+}
+function cacheSchema(env: string, schema: SchemaCache) {
+  try { localStorage.setItem(schemaKey(env), JSON.stringify(schema)); } catch { /* ignore quota */ }
+}
+
 function getOrCreateSessionId(): string {
   const existing = localStorage.getItem(SESSION_KEY);
   if (existing) return existing;
@@ -270,17 +281,33 @@ export const useAppStore = create<AppStore>((set, get) => ({
   switchEnv: async (env: string) => {
     try {
       const res = await api.switchEnv(env);
+
+      // Apply cached schema immediately for instant sidebar display
+      const cached = loadCachedSchema(env);
       set({
         activeEnv: res.env,
         activeHost: res.host,
         dbStatus: res.status,
-        schema: res.db_schema,
+        schema: cached ?? res.db_schema,
         discoveredDbs: res.discovered_dbs,
         excludedDbs: res.excluded_dbs,
         queryResults: {},
         queryErrors: {},
         pythonResults: {},
       });
+
+      // If backend already returned schema (from lifespan fetch), use and cache it
+      if (Object.keys(res.db_schema).length > 0) {
+        cacheSchema(env, res.db_schema);
+        set({ schema: res.db_schema });
+      } else {
+        // Fetch schema in background (lazy pool creation happens here)
+        api.getSchema().then((schemaRes) => {
+          const schema = schemaRes.schema_;
+          cacheSchema(env, schema);
+          set({ schema });
+        }).catch(console.error);
+      }
     } catch (err) {
       console.error("Failed to switch environment:", err);
     }
@@ -289,6 +316,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
   reloadConfig: async () => {
     try {
       const res = await api.reloadConfig();
+      if (Object.keys(res.db_schema).length > 0) {
+        cacheSchema(res.env, res.db_schema);
+      }
       set({
         activeEnv: res.env,
         activeHost: res.host,

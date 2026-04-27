@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from connections import ConnectionManager
@@ -28,29 +29,26 @@ _COLUMNS_QUERY = """
 
 
 async def fetch_schema(manager: ConnectionManager) -> SchemaCache:
-    """Fetch schema for all DBs in the active environment.
+    """Fetch schema for all user DBs in the active environment (lazy pool creation).
 
     Returns a dict: {db_name: {table_name: [column_names]}}.
     Silently skips DBs with connection errors (returns empty dict for them).
     """
     cache: SchemaCache = {}
 
-    for db_name in manager.known_dbs:
+    async def _fetch_one(db_name: str) -> None:
         try:
             pool = await manager.get_pool(db_name)
             async with pool.acquire() as conn:
                 columns_rows = await conn.fetch(_COLUMNS_QUERY)
-
             db_schema: dict[str, list[str]] = {}
             for row in columns_rows:
-                table = row["table_name"]
-                col = row["column_name"]
-                db_schema.setdefault(table, []).append(col)
-
+                db_schema.setdefault(row["table_name"], []).append(row["column_name"])
             cache[db_name] = db_schema
             logger.debug("Schema loaded for %s: %d tables", db_name, len(db_schema))
         except Exception as e:
             logger.warning("Could not fetch schema for %s: %s", db_name, e)
             cache[db_name] = {}
 
+    await asyncio.gather(*[_fetch_one(db) for db in manager.known_dbs])
     return cache
