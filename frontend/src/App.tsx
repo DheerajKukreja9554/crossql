@@ -32,6 +32,13 @@ export default function App() {
     queryErrors,
     queryingTabs,
     runQuery,
+    // Saved queries + history
+    savedQueries,
+    history,
+    deleteSavedQuery,
+    updateSavedQuery,
+    openQueryInTab,
+    saveQuery,
   } = store;
 
   const activeTab = tabs.find(t => t.id === activeTabId);
@@ -51,6 +58,13 @@ export default function App() {
 
   const handleRunQuery = (sql: string) => {
     runQuery(sql);
+  };
+
+  const handleSaveQuery = (sql: string) => {
+    const name = prompt("Save query as:", activeTab?.name ?? "My Query");
+    if (name?.trim()) {
+      saveQuery(name.trim(), sql).catch(console.error);
+    }
   };
 
   const handleInsertRef = (ref: string) => {
@@ -84,8 +98,13 @@ export default function App() {
           dbStatus={dbStatus}
           activeHost={activeHost}
           activeEnv={activeEnv}
+          savedQueries={savedQueries}
+          history={history}
           onInsertRef={handleInsertRef}
           onReloadConfig={reloadConfig}
+          onOpenQuery={openQueryInTab}
+          onDeleteQuery={deleteSavedQuery}
+          onRenameQuery={(id, name) => updateSavedQuery(id, { name })}
         />
 
         <div className="workspace">
@@ -95,6 +114,7 @@ export default function App() {
               sql={activeTab?.sql ?? ""}
               onSqlChange={(sql) => updateTabSql(activeTabId, sql)}
               onRun={handleRunQuery}
+              onSave={handleSaveQuery}
               isQuerying={isQuerying}
             />
           </div>

@@ -26,6 +26,7 @@ from models import (
     ConnectionsListResponse,
     CreateConnectionRequest,
     CreateConnectionResponse,
+    CreateQueryRequest,
     DbStatus,
     EnvironmentInfo,
     EnvironmentsResponse,
@@ -36,6 +37,8 @@ from models import (
     RunPythonResponse,
     RunQueryRequest,
     RunQueryResponse,
+    SavedQueriesResponse,
+    SavedQueryModel,
     SchemaResponse,
     SwitchEnvRequest,
     SwitchEnvResponse,
@@ -43,7 +46,9 @@ from models import (
     TestConnectionResponse,
     TimingInfo,
     UpdateConnectionRequest,
+    UpdateQueryRequest,
 )
+from queries import create_query, delete_query, get_queries, update_query
 from query.executor import QueryTimeoutError, RowLimitError, execute_query
 from query.parser import ParseError, parse_query
 from query.schema import fetch_schema
@@ -340,3 +345,41 @@ async def remove_connection(env_name: str, request: Request):
         return {"deleted": True}
     except Exception as e:
         return _error(ErrorCode.CONNECTION_ERROR, str(e))
+
+
+# ── Saved Queries ─────────────────────────────────────────────────────────────
+
+@app.get("/api/queries", response_model=SavedQueriesResponse)
+async def list_queries():
+    queries = get_queries()
+    return SavedQueriesResponse(queries=[SavedQueryModel(**q.model_dump()) for q in queries])
+
+
+@app.post("/api/queries", response_model=SavedQueryModel)
+async def save_query(body: CreateQueryRequest):
+    try:
+        q = create_query(name=body.name, sql=body.sql, folder=body.folder)
+        return SavedQueryModel(**q.model_dump())
+    except Exception as e:
+        return _error(ErrorCode.CONNECTION_ERROR, str(e))
+
+
+@app.put("/api/queries/{query_id}", response_model=SavedQueryModel)
+async def edit_query(query_id: str, body: UpdateQueryRequest):
+    try:
+        kwargs = {k: v for k, v in body.model_dump().items() if v is not None}
+        q = update_query(query_id, **kwargs)
+        return SavedQueryModel(**q.model_dump())
+    except ValueError as e:
+        return _error(ErrorCode.NOT_FOUND, str(e), status=404)
+    except Exception as e:
+        return _error(ErrorCode.CONNECTION_ERROR, str(e))
+
+
+@app.delete("/api/queries/{query_id}")
+async def remove_query(query_id: str):
+    try:
+        delete_query(query_id)
+        return {"deleted": True}
+    except ValueError as e:
+        return _error(ErrorCode.NOT_FOUND, str(e), status=404)

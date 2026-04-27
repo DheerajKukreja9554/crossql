@@ -20,6 +20,7 @@ interface QueryEditorProps {
   sql: string;
   onSqlChange: (sql: string) => void;
   onRun: (sql: string) => void;
+  onSave?: (sql: string) => void;
   isQuerying: boolean;
 }
 
@@ -111,7 +112,7 @@ function buildCompletionSource(schema: SchemaCache, sqlRef: React.RefObject<stri
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export function QueryEditor({ tabId, sql: value, onSqlChange, onRun, isQuerying }: QueryEditorProps) {
+export function QueryEditor({ tabId, sql: value, onSqlChange, onRun, onSave, isQuerying }: QueryEditorProps) {
   const { schema, theme } = useAppStore();
   const sqlRef = useRef(value);
   sqlRef.current = value;
@@ -186,6 +187,11 @@ export function QueryEditor({ tabId, sql: value, onSqlChange, onRun, isQuerying 
               <button className="btn-ghost" onClick={handleRunAll} title="Run all (⌘⇧↵)" style={{ fontSize: "var(--tx-xs)", color: "var(--tx-3)" }}>
                 Run All
               </button>
+              {onSave && value.trim() && (
+                <button className="btn-ghost" onClick={() => onSave(value)} title="Save query" style={{ fontSize: "var(--tx-xs)", color: "var(--tx-3)" }}>
+                  <Icons.bookmark size={11} /> Save
+                </button>
+              )}
             </>
           )}
         </div>

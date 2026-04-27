@@ -1,15 +1,24 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { Icons } from "./Icons";
-import type { SchemaCache, DbStatus } from "../api/client";
+import { SavedQueriesPanel } from "./SavedQueriesPanel";
+import type { SchemaCache, DbStatus, SavedQuery } from "../api/client";
+import type { HistoryEntry } from "../store/useAppStore";
 
 interface SidebarProps {
   schema: SchemaCache;
   dbStatus: DbStatus;
   activeHost: string | null;
   activeEnv: string | null;
+  savedQueries: SavedQuery[];
+  history: HistoryEntry[];
   onInsertRef: (ref: string) => void;
   onReloadConfig: () => void;
+  onOpenQuery: (sql: string, name?: string) => void;
+  onDeleteQuery: (id: string) => void;
+  onRenameQuery: (id: string, name: string) => void;
 }
+
+type SidebarTab = "databases" | "saved";
 
 const MIN_WIDTH = 200;
 const MAX_WIDTH = 500;
@@ -20,10 +29,16 @@ export function Sidebar({
   dbStatus,
   activeHost,
   activeEnv,
+  savedQueries,
+  history,
   onInsertRef,
   onReloadConfig,
+  onOpenQuery,
+  onDeleteQuery,
+  onRenameQuery,
 }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>("databases");
   const [search, setSearch] = useState("");
   const [expandedDbs, setExpandedDbs] = useState<Record<string, boolean>>({});
   const [expandedTables, setExpandedTables] = useState<Record<string, boolean>>({});
@@ -119,36 +134,71 @@ export function Sidebar({
       {/* Header */}
       <div className="sb-head">
         <div className="sb-head-row">
-          <span className="sb-title">Databases</span>
-          <div className="sb-head-actions">
-            <button className="sb-icon-btn" title="Refresh" onClick={onReloadConfig}>
-              <Icons.refresh size={12} />
+          <div className="sb-tabs">
+            <button
+              className={`sb-tab${sidebarTab === "databases" ? " active" : ""}`}
+              onClick={() => setSidebarTab("databases")}
+            >
+              <Icons.db size={11} />
+              Databases
             </button>
+            <button
+              className={`sb-tab${sidebarTab === "saved" ? " active" : ""}`}
+              onClick={() => setSidebarTab("saved")}
+            >
+              <Icons.bookmark size={11} />
+              Saved
+              {savedQueries.length > 0 && (
+                <span className="sb-tab-count">{savedQueries.length}</span>
+              )}
+            </button>
+          </div>
+          <div className="sb-head-actions">
+            {sidebarTab === "databases" && (
+              <button className="sb-icon-btn" title="Refresh" onClick={onReloadConfig}>
+                <Icons.refresh size={12} />
+              </button>
+            )}
             <button className="sb-icon-btn" title="Collapse" onClick={() => setCollapsed(true)}>
               <Icons.sidebar size={14} />
             </button>
           </div>
         </div>
-        <div className="sb-search">
-          <span style={{ color: "var(--tx-4)", display: "flex" }}>
-            <Icons.search size={12} />
-          </span>
-          <input
-            type="text"
-            placeholder="Filter tables & columns..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          {search && (
-            <button className="sb-icon-btn" style={{ width: 18, height: 18 }} onClick={() => setSearch("")}>
-              <Icons.close size={10} />
-            </button>
-          )}
-        </div>
+        {sidebarTab === "databases" && (
+          <div className="sb-search">
+            <span style={{ color: "var(--tx-4)", display: "flex" }}>
+              <Icons.search size={12} />
+            </span>
+            <input
+              type="text"
+              placeholder="Filter tables & columns..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {search && (
+              <button className="sb-icon-btn" style={{ width: 18, height: 18 }} onClick={() => setSearch("")}>
+                <Icons.close size={10} />
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
+      {/* Saved queries panel */}
+      {sidebarTab === "saved" && (
+        <div className="sb-body">
+          <SavedQueriesPanel
+            savedQueries={savedQueries}
+            history={history}
+            onOpen={onOpenQuery}
+            onDelete={onDeleteQuery}
+            onRename={onRenameQuery}
+          />
+        </div>
+      )}
+
       {/* Tree body */}
-      <div className="sb-body">
+      {sidebarTab === "databases" && <div className="sb-body">
         {activeHost ? (
           <div className="sb-server">
             {/* Server header */}
@@ -259,7 +309,7 @@ export function Sidebar({
             No environment selected.
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Resize handle */}
       <div

@@ -51,6 +51,15 @@ export interface PythonResult {
   error?: string;
 }
 
+export interface SavedQuery {
+  id: string;
+  name: string;
+  sql: string;
+  folder: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface AppError {
   error: string;
   detail: string;
@@ -142,5 +151,29 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ code, session_id: sessionId }),
     });
+  },
+
+  // ── Saved queries ──────────────────────────────────────────────────────────
+
+  getQueries(): Promise<{ queries: SavedQuery[] }> {
+    return request("/api/queries");
+  },
+
+  createQuery(name: string, sql: string, folder = ""): Promise<SavedQuery> {
+    return request("/api/queries", {
+      method: "POST",
+      body: JSON.stringify({ name, sql, folder }),
+    });
+  },
+
+  updateQuery(id: string, patch: Partial<Pick<SavedQuery, "name" | "sql" | "folder">>): Promise<SavedQuery> {
+    return request(`/api/queries/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(patch),
+    });
+  },
+
+  deleteQuery(id: string): Promise<{ deleted: boolean }> {
+    return request(`/api/queries/${id}`, { method: "DELETE" });
   },
 };

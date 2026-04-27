@@ -7,6 +7,7 @@ import {
   EnvironmentInfo,
   PythonResult,
   QueryResult,
+  SavedQuery,
   SchemaCache,
 } from "../api/client";
 
@@ -15,6 +16,8 @@ const THEME_KEY = "crossql-theme";
 const PALETTE_KEY = "crossql-palette";
 const TABS_KEY = "crossql-tabs";
 const ACTIVE_TAB_KEY = "crossql-active-tab";
+const HISTORY_KEY = "crossql-history";
+const MAX_HISTORY = 50;
 
 function getOrCreateSessionId(): string {
   const existing = localStorage.getItem(SESSION_KEY);
@@ -22,6 +25,31 @@ function getOrCreateSessionId(): string {
   const id = uuidv4();
   localStorage.setItem(SESSION_KEY, id);
   return id;
+}
+
+// ── History ──────────────────────────────────────────────────────────────────
+
+export interface HistoryEntry {
+  sql: string;
+  env: string | null;
+  timestamp: string;
+  rowCount: number | null;
+  ms: number | null;
+  success: boolean;
+}
+
+function loadHistory(): HistoryEntry[] {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    return raw ? (JSON.parse(raw) as HistoryEntry[]) : [];
+  } catch { return []; }
+}
+
+function appendHistory(entry: HistoryEntry): HistoryEntry[] {
+  const prev = loadHistory();
+  const updated = [entry, ...prev].slice(0, MAX_HISTORY);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+  return updated;
 }
 
 export type Theme = "dark" | "light";
@@ -101,6 +129,10 @@ interface AppStore {
   theme: Theme;
   palette: Palette;
 
+  // Saved queries + history
+  savedQueries: SavedQuery[];
+  history: HistoryEntry[];
+
   // Tab actions
   addTab: () => void;
   closeTab: (tabId: string) => void;
@@ -117,6 +149,13 @@ interface AppStore {
   runQuery: (sql: string) => Promise<void>;
   runPython: (code: string) => Promise<void>;
   clearQueryError: () => void;
+
+  // Saved query actions
+  loadSavedQueries: () => Promise<void>;
+  saveQuery: (name: string, sql: string, folder?: string) => Promise<SavedQuery>;
+  updateSavedQuery: (id: string, patch: Partial<Pick<SavedQuery, "name" | "sql" | "folder">>) => Promise<void>;
+  deleteSavedQuery: (id: string) => Promise<void>;
+  openQueryInTab: (sql: string, name?: string) => void;
 
   // Theme actions
   setTheme: (theme: Theme) => void;
@@ -153,6 +192,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
   pythonResults: {},
   isPythonRunning: false,
   pythonOpen: false,
+
+  savedQueries: [],
+  history: loadHistory(),
 
   theme: (localStorage.getItem(THEME_KEY) as Theme) || "dark",
   palette: (localStorage.getItem(PALETTE_KEY) as Palette) || "default",
@@ -219,6 +261,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       if (targetEnv && !get().activeEnv) {
         await get().switchEnv(targetEnv);
       }
+      get().loadSavedQueries();
     } catch (err) {
       console.error("Failed to load environments:", err);
     }
@@ -261,11 +304,53 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }
   },
 
+  // ── Saved query actions ──────────────────────────────────────────────────
+
+  loadSavedQueries: async () => {
+    try {
+      const res = await api.getQueries();
+      set({ savedQueries: res.queries });
+    } catch (e) {
+      console.error("Failed to load saved queries:", e);
+    }
+  },
+
+  saveQuery: async (name: string, sql: string, folder = "") => {
+    const q = await api.createQuery(name, sql, folder);
+    set(s => ({ savedQueries: [...s.savedQueries, q] }));
+    return q;
+  },
+
+  updateSavedQuery: async (id: string, patch) => {
+    const q = await api.updateQuery(id, patch);
+    set(s => ({ savedQueries: s.savedQueries.map(sq => sq.id === id ? q : sq) }));
+  },
+
+  deleteSavedQuery: async (id: string) => {
+    await api.deleteQuery(id);
+    set(s => ({ savedQueries: s.savedQueries.filter(sq => sq.id !== id) }));
+  },
+
+  openQueryInTab: (sql: string, name?: string) => {
+    const { tabs, addTab } = get();
+    if (tabs.length < 10) {
+      addTab();
+    }
+    // After addTab, the new tab is active — update its SQL
+    const { activeTabId } = get();
+    const newTabs = get().tabs.map(t =>
+      t.id === activeTabId ? { ...t, sql, name: name ?? t.name, dirty: false } : t
+    );
+    set({ tabs: newTabs });
+    persistTabs(newTabs, activeTabId);
+  },
+
   // ── Query actions ────────────────────────────────────────────────────────
 
   runQuery: async (sql: string) => {
-    const { activeTabId, sessionId } = get();
+    const { activeTabId, sessionId, activeEnv } = get();
     const compositeSession = `${sessionId}:${activeTabId}`;
+    const startMs = Date.now();
 
     set(s => ({
       queryingTabs: { ...s.queryingTabs, [activeTabId]: true },
@@ -277,23 +362,33 @@ export const useAppStore = create<AppStore>((set, get) => ({
     try {
       const result = await api.runQuery(sql, compositeSession);
       if ("code" in result) {
+        const entry: HistoryEntry = { sql, env: activeEnv, timestamp: new Date().toISOString(), rowCount: null, ms: Date.now() - startMs, success: false };
+        const history = appendHistory(entry);
         set(s => ({
           queryErrors: { ...s.queryErrors, [activeTabId]: result as AppError },
           queryingTabs: { ...s.queryingTabs, [activeTabId]: false },
+          history,
         }));
         return;
       }
+      const qr = result as QueryResult;
+      const entry: HistoryEntry = { sql, env: activeEnv, timestamp: new Date().toISOString(), rowCount: qr.row_count, ms: qr.timing.total_ms, success: true };
+      const history = appendHistory(entry);
       set(s => ({
-        queryResults: { ...s.queryResults, [activeTabId]: result as QueryResult },
+        queryResults: { ...s.queryResults, [activeTabId]: qr },
         queryingTabs: { ...s.queryingTabs, [activeTabId]: false },
+        history,
       }));
     } catch (err: unknown) {
       const appErr = (err && typeof err === "object" && "code" in err)
         ? err as AppError
         : { error: String(err), detail: "", code: "CONNECTION_ERROR" as const };
+      const entry: HistoryEntry = { sql, env: activeEnv, timestamp: new Date().toISOString(), rowCount: null, ms: Date.now() - startMs, success: false };
+      const history = appendHistory(entry);
       set(s => ({
         queryErrors: { ...s.queryErrors, [activeTabId]: appErr },
         queryingTabs: { ...s.queryingTabs, [activeTabId]: false },
+        history,
       }));
     }
   },

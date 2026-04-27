@@ -152,4 +152,15 @@ export const Icons = {
       <circle cx="12.5" cy="8" r="1.3" fill="currentColor"/>
     </svg>
   ),
+  bookmark: ({ size = 14 }: P) => (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden>
+      <path d="M3.5 2.5h9a.5.5 0 0 1 .5.5v10.7l-5-3-5 3V3a.5.5 0 0 1 .5-.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+    </svg>
+  ),
+  clock: ({ size = 14 }: P) => (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden>
+      <circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.4"/>
+      <path d="M8 5v3.5l2 1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ),
 };

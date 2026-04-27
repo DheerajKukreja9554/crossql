@@ -160,3 +160,30 @@ class TestConnectionResponse(BaseModel):
     status: str  # "ok" | "error"
     discovered_dbs: list[str] = []
     error: str | None = None
+
+
+# ── Saved Queries ─────────────────────────────────────────────────────────────
+
+class SavedQueryModel(BaseModel):
+    id: str
+    name: str
+    sql: str
+    folder: str = ""
+    created_at: str
+    updated_at: str
+
+
+class SavedQueriesResponse(BaseModel):
+    queries: list[SavedQueryModel]
+
+
+class CreateQueryRequest(BaseModel):
+    name: str
+    sql: str
+    folder: str = ""
+
+
+class UpdateQueryRequest(BaseModel):
+    name: str | None = None
+    sql: str | None = None
+    folder: str | None = None
