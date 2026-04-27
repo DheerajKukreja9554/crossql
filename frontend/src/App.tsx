@@ -43,6 +43,7 @@ export default function App() {
   } = store;
 
   const [manageConnectionsOpen, setManageConnectionsOpen] = useState(false);
+  const [closeConfirmTab, setCloseConfirmTab] = useState<{ id: string; name: string; sql: string } | null>(null);
 
   const activeTab = tabs.find(t => t.id === activeTabId);
   const activeQueryResult = queryResults[activeTabId] ?? null;
@@ -66,9 +67,19 @@ export default function App() {
   const handleCloseTab = (tabId: string) => {
     const tab = tabs.find(t => t.id === tabId);
     if (tab?.dirty && tab.sql.trim()) {
-      if (!window.confirm(`Close "${tab.name}"? Unsaved changes will be lost.`)) return;
+      setCloseConfirmTab({ id: tab.id, name: tab.name, sql: tab.sql });
+      return;
     }
     closeTab(tabId);
+  };
+
+  const handleSaveAndClose = (tab: { id: string; name: string; sql: string }) => {
+    const name = prompt("Save query as:", tab.name.replace(".sql", ""));
+    if (name?.trim()) {
+      saveQuery(name.trim(), tab.sql)
+        .then(() => { closeTab(tab.id); setCloseConfirmTab(null); })
+        .catch(console.error);
+    }
   };
 
   const handleSaveQuery = (sql: string) => {
@@ -149,6 +160,33 @@ export default function App() {
 
       {manageConnectionsOpen && (
         <ManageConnectionsModal onClose={() => setManageConnectionsOpen(false)} />
+      )}
+
+      {closeConfirmTab && (
+        <div className="modal-overlay" onClick={() => setCloseConfirmTab(null)}>
+          <div className="modal" style={{ width: 380 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <div className="modal-title">Unsaved changes</div>
+                <div className="modal-subtitle">"{closeConfirmTab.name}" has unsaved content.</div>
+              </div>
+            </div>
+            <div className="modal-body" style={{ padding: "14px 20px", fontSize: 13, color: "var(--tx-2)" }}>
+              Do you want to save this query before closing?
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-ghost" onClick={() => setCloseConfirmTab(null)}>Cancel</button>
+              <div className="modal-footer-right">
+                <button className="btn btn-ghost" onClick={() => { closeTab(closeConfirmTab.id); setCloseConfirmTab(null); }}>
+                  Discard
+                </button>
+                <button className="btn btn-primary" onClick={() => handleSaveAndClose(closeConfirmTab)}>
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -571,7 +571,9 @@ button { background: none; border: 0; cursor: pointer; padding: 0; }
 }
 .editor-body .cm-editor .cm-activeLineGutter { background: var(--bg-2); }
 .editor-body .cm-editor .cm-activeLine { background: var(--bg-2); }
-.editor-body .cm-editor .cm-selectionBackground { background: color-mix(in oklch, var(--acc) 25%, transparent) !important; }
+.editor-body .cm-editor .cm-selectionBackground { background: color-mix(in oklch, var(--acc) 38%, transparent) !important; }
+.editor-body .cm-editor.cm-focused .cm-selectionBackground { background: color-mix(in oklch, var(--acc) 38%, transparent) !important; }
+.editor-body .cm-editor .cm-content ::selection { background: color-mix(in oklch, var(--acc) 38%, transparent); }
 .editor-body .cm-editor .cm-cursor { border-left-color: var(--tx-1); }
 .editor-body .cm-editor.cm-focused { outline: none; }
 

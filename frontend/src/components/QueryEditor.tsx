@@ -53,7 +53,9 @@ function buildCompletionSource(schema: SchemaCache, sqlRef: React.RefObject<stri
 
   return (context: CompletionContext): CompletionResult | null => {
     const word = context.matchBefore(/[\w.]*/);
-    if (!word || (word.from === word.to && !context.explicit)) return null;
+    if (!word || word.from === word.to) return null;
+    // Require at least 2 chars when auto-triggered; Ctrl+Space always works
+    if (!context.explicit && word.text.length < 2) return null;
 
     // Parse aliases from current SQL text (read from ref, not from dependency)
     const aliases = parseAliases(sqlRef.current ?? "");
@@ -140,7 +142,7 @@ export function QueryEditor({ tabId, sql: value, onSqlChange, onRun, onSave, isQ
       sql({ dialect: PostgreSQL, upperCaseKeywords: true }),
       autocompletion({
         override: [completionSource],
-        activateOnTyping: false,
+        activateOnTyping: true,
         maxRenderedOptions: 20,
         defaultKeymap: false,
       }),
@@ -218,6 +220,9 @@ export function QueryEditor({ tabId, sql: value, onSqlChange, onRun, onSave, isQ
             } else if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
               e.preventDefault();
               handleRun();
+            } else if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+              e.preventDefault();
+              if (onSave && value.trim()) onSave(value);
             }
           }}
         />

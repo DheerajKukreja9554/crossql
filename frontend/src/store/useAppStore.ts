@@ -375,17 +375,27 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   openQueryInTab: (sql: string, name?: string) => {
-    const { tabs, addTab } = get();
+    const { tabs, activeTabId, addTab } = get();
+    const currentTab = tabs.find(t => t.id === activeTabId);
+    // Reuse current tab if it's empty and clean
+    if (currentTab && !currentTab.dirty && !currentTab.sql.trim()) {
+      const newTabs = tabs.map(t =>
+        t.id === activeTabId ? { ...t, sql, name: name ?? t.name, dirty: false } : t
+      );
+      set({ tabs: newTabs });
+      persistTabs(newTabs, activeTabId);
+      return;
+    }
+    // Otherwise open in a new tab
     if (tabs.length < 10) {
       addTab();
     }
-    // After addTab, the new tab is active — update its SQL
-    const { activeTabId } = get();
+    const { activeTabId: newTabId } = get();
     const newTabs = get().tabs.map(t =>
-      t.id === activeTabId ? { ...t, sql, name: name ?? t.name, dirty: false } : t
+      t.id === newTabId ? { ...t, sql, name: name ?? t.name, dirty: false } : t
     );
     set({ tabs: newTabs });
-    persistTabs(newTabs, activeTabId);
+    persistTabs(newTabs, newTabId);
   },
 
   // ── Query actions ────────────────────────────────────────────────────────
