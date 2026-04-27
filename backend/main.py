@@ -266,6 +266,7 @@ async def list_connections(request: Request):
             user=cfg.user,
             has_password=bool(cfg.password or cfg.password_encrypted),
             needs_reauth=cfg.needs_reauth,
+            exclude_databases=cfg.exclude_databases,
         )
         for name, cfg in config.environments.items()
     ]

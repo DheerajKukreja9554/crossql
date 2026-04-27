@@ -120,6 +120,7 @@ class ConnectionInfo(BaseModel):
     user: str
     has_password: bool
     needs_reauth: bool
+    exclude_databases: list[str] = []
 
 
 class ConnectionsListResponse(BaseModel):
