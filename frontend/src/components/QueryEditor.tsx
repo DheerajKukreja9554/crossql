@@ -146,12 +146,17 @@ export function QueryEditor({ tabId, sql: value, onSqlChange, onRun, onSave, isQ
   const { schema, theme } = useAppStore();
   const sqlRef = useRef(value);
   sqlRef.current = value;
+  const editorViewRef = useRef<EditorView | null>(null);
 
   const handleRun = useCallback(() => {
     if (!value.trim()) return;
-    // Try to get cursor position from CodeMirror
-    // For now, run the full statement detection
-    const executed = getStatementAtCursor(value, undefined);
+    const view = editorViewRef.current;
+    const cursorPos = view ? view.state.selection.main.head : undefined;
+    const sel = view?.state.selection.main;
+    const selectionText = (sel && !sel.empty)
+      ? view!.state.sliceDoc(sel.from, sel.to)
+      : undefined;
+    const executed = getStatementAtCursor(value, cursorPos, selectionText);
     onRun(executed);
   }, [value, onRun]);
 
@@ -242,6 +247,7 @@ export function QueryEditor({ tabId, sql: value, onSqlChange, onRun, onSave, isQ
           onChange={onSqlChange}
           extensions={extensions}
           theme={theme === "dark" ? oneDark : undefined}
+          onCreateEditor={(view) => { editorViewRef.current = view; }}
           basicSetup={{
             lineNumbers: true,
             foldGutter: false,
