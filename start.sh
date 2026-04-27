@@ -12,23 +12,24 @@ if [[ -f "$PID_FILE" ]]; then
   exit 1
 fi
 
+LOG_FILE="$ROOT/.log"
+
 echo "Starting CrossQL..."
 
 # Backend
 cd "$ROOT/backend"
-uv run uvicorn main:app --port 8000 &
+uv run uvicorn main:app --port 8000 >> "$LOG_FILE" 2>&1 &
 BACKEND_PID=$!
 
 # Frontend
 cd "$ROOT/frontend"
-npm run dev &
+npm run dev >> "$LOG_FILE" 2>&1 &
 FRONTEND_PID=$!
 
 echo "$BACKEND_PID $FRONTEND_PID" > "$PID_FILE"
 
 echo "  Backend  → http://localhost:8000  (pid $BACKEND_PID)"
 echo "  Frontend → http://localhost:5173  (pid $FRONTEND_PID)"
+echo "  Logs     → $LOG_FILE"
 echo ""
 echo "Run ./stop.sh to stop both servers."
-
-wait

@@ -17,4 +17,5 @@ kill "$BACKEND_PID"  2>/dev/null && echo "Stopped backend  (pid $BACKEND_PID)"  
 kill "$FRONTEND_PID" 2>/dev/null && echo "Stopped frontend (pid $FRONTEND_PID)" || echo "Frontend already stopped"
 
 rm -f "$PID_FILE"
+rm -f "$ROOT/.log"
 echo "Done."
