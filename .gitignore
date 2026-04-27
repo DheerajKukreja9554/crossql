@@ -43,3 +43,4 @@ logs/
 # Remember logs and tmp files
 .remember/logs/
 .remember/tmp
+.pids
