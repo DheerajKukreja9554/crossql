@@ -169,4 +169,11 @@ export const Icons = {
       <path d="M8 1.5v1M8 13.5v1M1.5 8h1M13.5 8h1M3.4 3.4l.7.7M11.9 11.9l.7.7M3.4 12.6l.7-.7M11.9 4.1l.7-.7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
     </svg>
   ),
+  plug: ({ size = 14 }: P) => (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden>
+      <path d="M8 10.5v3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+      <rect x="4.5" y="6.5" width="7" height="4" rx="1.2" stroke="currentColor" strokeWidth="1.4"/>
+      <path d="M6 6.5V4M10 6.5V4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+    </svg>
+  ),
 };

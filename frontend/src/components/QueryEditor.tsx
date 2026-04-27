@@ -140,7 +140,7 @@ export function QueryEditor({ tabId, sql: value, onSqlChange, onRun, onSave, isQ
       sql({ dialect: PostgreSQL, upperCaseKeywords: true }),
       autocompletion({
         override: [completionSource],
-        activateOnTyping: true,
+        activateOnTyping: false,
         maxRenderedOptions: 20,
         defaultKeymap: false,
       }),

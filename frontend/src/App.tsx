@@ -63,6 +63,14 @@ export default function App() {
     runQuery(sql);
   };
 
+  const handleCloseTab = (tabId: string) => {
+    const tab = tabs.find(t => t.id === tabId);
+    if (tab?.dirty && tab.sql.trim()) {
+      if (!window.confirm(`Close "${tab.name}"? Unsaved changes will be lost.`)) return;
+    }
+    closeTab(tabId);
+  };
+
   const handleSaveQuery = (sql: string) => {
     const name = prompt("Save query as:", activeTab?.name ?? "My Query");
     if (name?.trim()) {
@@ -91,7 +99,7 @@ export default function App() {
         activeTabId={activeTabId}
         onSetActiveTab={setActiveTab}
         onAddTab={addTab}
-        onCloseTab={closeTab}
+        onCloseTab={handleCloseTab}
         onRenameTab={renameTab}
         onManageConnections={() => setManageConnectionsOpen(true)}
       />

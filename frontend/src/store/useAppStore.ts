@@ -16,8 +16,18 @@ const THEME_KEY = "crossql-theme";
 const PALETTE_KEY = "crossql-palette";
 const TABS_KEY = "crossql-tabs";
 const ACTIVE_TAB_KEY = "crossql-active-tab";
+const TAB_COUNTER_KEY = "crossql-tab-counter";
 const HISTORY_KEY = "crossql-history";
 const MAX_HISTORY = 50;
+
+function loadTabCounter(fallback: number): number {
+  const raw = localStorage.getItem(TAB_COUNTER_KEY);
+  const n = raw ? parseInt(raw, 10) : NaN;
+  return isNaN(n) ? fallback : n;
+}
+function persistTabCounter(n: number) {
+  localStorage.setItem(TAB_COUNTER_KEY, String(n));
+}
 
 function schemaKey(env: string) { return `crossql-schema-${env}`; }
 function loadCachedSchema(env: string): SchemaCache | null {
@@ -127,6 +137,7 @@ interface AppStore {
   // Tabs
   tabs: QueryTab[];
   activeTabId: string;
+  tabCounter: number;
   queryResults: Record<string, QueryResult>;  // tabId → result
   queryErrors: Record<string, AppError>;      // tabId → error
   queryingTabs: Record<string, boolean>;      // tabId → isQuerying
@@ -196,6 +207,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   tabs: initialTabs.tabs,
   activeTabId: initialTabs.activeTabId,
+  tabCounter: loadTabCounter(initialTabs.tabs.length),
   queryResults: {},
   queryErrors: {},
   queryingTabs: {},
@@ -213,13 +225,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
   // ── Tab actions ──────────────────────────────────────────────────────────
 
   addTab: () => {
-    const { tabs } = get();
+    const { tabs, tabCounter } = get();
     if (tabs.length >= 10) return;
-    const n = tabs.length + 1;
+    const n = tabCounter + 1;
     const tab = createTab(n);
     const newTabs = [...tabs, tab];
-    set({ tabs: newTabs, activeTabId: tab.id });
+    set({ tabs: newTabs, activeTabId: tab.id, tabCounter: n });
     persistTabs(newTabs, tab.id);
+    persistTabCounter(n);
   },
 
   closeTab: (tabId: string) => {

@@ -200,7 +200,7 @@ export function TopBar({
           onClick={onManageConnections}
           title="Manage connections"
         >
-          <Icons.settings size={14} />
+          <Icons.plug size={14} />
         </button>
 
         <button
