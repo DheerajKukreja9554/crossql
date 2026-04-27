@@ -18,6 +18,7 @@ interface TopBarProps {
   onAddTab: () => void;
   onCloseTab: (id: string) => void;
   onRenameTab: (id: string, name: string) => void;
+  onManageConnections: () => void;
 }
 
 function envColor(name: string): string {
@@ -42,6 +43,7 @@ export function TopBar({
   onAddTab,
   onCloseTab,
   onRenameTab,
+  onManageConnections,
 }: TopBarProps) {
   const [envOpen, setEnvOpen] = useState(false);
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
@@ -193,6 +195,14 @@ export function TopBar({
       </div>
 
       <div className="topbar-right">
+        <button
+          className="icon-btn"
+          onClick={onManageConnections}
+          title="Manage connections"
+        >
+          <Icons.settings size={14} />
+        </button>
+
         <button
           className="icon-btn"
           onClick={onToggleTheme}

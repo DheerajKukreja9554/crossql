@@ -1,5 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { TopBar } from "./components/TopBar";
+import { ManageConnectionsModal } from "./components/ManageConnectionsModal";
 import { Sidebar } from "./components/Sidebar";
 import { QueryEditor } from "./components/QueryEditor";
 import { ResultsPanel } from "./components/ResultsPanel";
@@ -40,6 +41,8 @@ export default function App() {
     openQueryInTab,
     saveQuery,
   } = store;
+
+  const [manageConnectionsOpen, setManageConnectionsOpen] = useState(false);
 
   const activeTab = tabs.find(t => t.id === activeTabId);
   const activeQueryResult = queryResults[activeTabId] ?? null;
@@ -90,6 +93,7 @@ export default function App() {
         onAddTab={addTab}
         onCloseTab={closeTab}
         onRenameTab={renameTab}
+        onManageConnections={() => setManageConnectionsOpen(true)}
       />
 
       <div className="app-body">
@@ -134,6 +138,10 @@ export default function App() {
       </div>
 
       <StatusBar />
+
+      {manageConnectionsOpen && (
+        <ManageConnectionsModal onClose={() => setManageConnectionsOpen(false)} />
+      )}
     </div>
   );
 }
