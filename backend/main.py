@@ -11,9 +11,21 @@ from fastapi.responses import JSONResponse
 
 from pathlib import Path
 
-from config import load_config
+import asyncpg
+
+from config import (
+    SYSTEM_DATABASES,
+    add_environment,
+    delete_environment,
+    load_config,
+    update_environment,
+)
 from connections import ConnectionManager
 from models import (
+    ConnectionInfo,
+    ConnectionsListResponse,
+    CreateConnectionRequest,
+    CreateConnectionResponse,
     DbStatus,
     EnvironmentInfo,
     EnvironmentsResponse,
@@ -27,7 +39,10 @@ from models import (
     SchemaResponse,
     SwitchEnvRequest,
     SwitchEnvResponse,
+    TestConnectionRequest,
+    TestConnectionResponse,
     TimingInfo,
+    UpdateConnectionRequest,
 )
 from query.executor import QueryTimeoutError, RowLimitError, execute_query
 from query.parser import ParseError, parse_query
@@ -231,3 +246,97 @@ async def run_query(body: RunQueryRequest, request: Request):
 async def run_python_code(body: RunPythonRequest, request: Request):
     result = run_python(body.code, body.session_id)
     return RunPythonResponse(output=result.output, error=result.error)
+
+
+# ── Connection CRUD ───────────────────────────────────────────────────────────
+
+@app.get("/api/connections", response_model=ConnectionsListResponse)
+async def list_connections(request: Request):
+    config = request.app.state.config
+    envs = [
+        ConnectionInfo(
+            name=name,
+            host=cfg.host,
+            port=cfg.port,
+            user=cfg.user,
+            has_password=bool(cfg.password or cfg.password_encrypted),
+            needs_reauth=cfg.needs_reauth,
+        )
+        for name, cfg in config.environments.items()
+    ]
+    return ConnectionsListResponse(environments=envs)
+
+
+@app.post("/api/connections/test", response_model=TestConnectionResponse)
+async def test_connection(body: TestConnectionRequest):
+    """Test a connection and discover databases without saving."""
+    try:
+        conn = await asyncpg.connect(
+            host=body.host, port=body.port, user=body.user,
+            password=body.password, database="postgres", timeout=10,
+        )
+        try:
+            rows = await conn.fetch(
+                "SELECT datname FROM pg_database WHERE datistemplate = false ORDER BY datname"
+            )
+            dbs = [r["datname"] for r in rows if r["datname"] not in SYSTEM_DATABASES]
+            return TestConnectionResponse(status="ok", discovered_dbs=dbs)
+        finally:
+            await conn.close()
+    except Exception as e:
+        return TestConnectionResponse(status="error", error=str(e))
+
+
+@app.post("/api/connections", response_model=CreateConnectionResponse)
+async def create_connection(body: CreateConnectionRequest, request: Request):
+    """Add a new environment with encrypted password."""
+    try:
+        config = add_environment(
+            name=body.name, host=body.host, port=body.port,
+            user=body.user, password=body.password,
+            exclude_databases=body.exclude_databases,
+        )
+        request.app.state.config = config
+        request.app.state.manager.update_config(config)
+
+        # Try connecting to discover DBs
+        try:
+            status = await request.app.state.manager.switch_env(body.name)
+            schema = await fetch_schema(request.app.state.manager)
+            request.app.state.schema_cache = schema
+            return CreateConnectionResponse(
+                name=body.name, status="ok",
+                discovered_dbs=request.app.state.manager.discovered_dbs,
+            )
+        except Exception as e:
+            return CreateConnectionResponse(name=body.name, status="error", discovered_dbs=[])
+    except Exception as e:
+        return _error(ErrorCode.CONNECTION_ERROR, str(e))
+
+
+@app.put("/api/connections/{env_name}", response_model=CreateConnectionResponse)
+async def update_connection(env_name: str, body: UpdateConnectionRequest, request: Request):
+    """Update an existing environment."""
+    try:
+        kwargs = {k: v for k, v in body.model_dump().items() if v is not None}
+        config = update_environment(env_name, **kwargs)
+        request.app.state.config = config
+        request.app.state.manager.update_config(config)
+        return CreateConnectionResponse(name=env_name, status="ok", discovered_dbs=[])
+    except Exception as e:
+        return _error(ErrorCode.CONNECTION_ERROR, str(e))
+
+
+@app.delete("/api/connections/{env_name}")
+async def remove_connection(env_name: str, request: Request):
+    """Remove an environment."""
+    manager: ConnectionManager = request.app.state.manager
+    if manager.active_env == env_name:
+        return _error(ErrorCode.CONNECTION_ERROR, "Cannot delete the active environment. Switch to another first.")
+    try:
+        config = delete_environment(env_name)
+        request.app.state.config = config
+        manager.update_config(config)
+        return {"deleted": True}
+    except Exception as e:
+        return _error(ErrorCode.CONNECTION_ERROR, str(e))

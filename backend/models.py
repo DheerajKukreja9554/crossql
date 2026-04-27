@@ -109,3 +109,54 @@ class RunPythonRequest(BaseModel):
 class RunPythonResponse(BaseModel):
     output: str
     error: str | None = None
+
+
+# ── Connections CRUD ──────────────────────────────────────────────────────────
+
+class ConnectionInfo(BaseModel):
+    name: str
+    host: str
+    port: int
+    user: str
+    has_password: bool
+    needs_reauth: bool
+
+
+class ConnectionsListResponse(BaseModel):
+    environments: list[ConnectionInfo]
+
+
+class CreateConnectionRequest(BaseModel):
+    name: str
+    host: str
+    port: int = 5432
+    user: str
+    password: str
+    exclude_databases: list[str] = []
+
+
+class CreateConnectionResponse(BaseModel):
+    name: str
+    status: str  # "ok" | "error"
+    discovered_dbs: list[str]
+
+
+class UpdateConnectionRequest(BaseModel):
+    host: str | None = None
+    port: int | None = None
+    user: str | None = None
+    password: str | None = None
+    exclude_databases: list[str] | None = None
+
+
+class TestConnectionRequest(BaseModel):
+    host: str
+    port: int = 5432
+    user: str
+    password: str
+
+
+class TestConnectionResponse(BaseModel):
+    status: str  # "ok" | "error"
+    discovered_dbs: list[str] = []
+    error: str | None = None
