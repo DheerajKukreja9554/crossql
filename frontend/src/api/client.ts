@@ -60,6 +60,28 @@ export interface SavedQuery {
   updated_at: string;
 }
 
+export interface ConnectionInfo {
+  name: string;
+  host: string;
+  port: number;
+  user: string;
+  has_password: boolean;
+  needs_reauth: boolean;
+  exclude_databases: string[];
+}
+
+export interface TestConnectionResult {
+  status: "ok" | "error";
+  discovered_dbs: string[];
+  error?: string;
+}
+
+export interface CreateConnectionResult {
+  name: string;
+  status: string;
+  discovered_dbs: string[];
+}
+
 export interface AppError {
   error: string;
   detail: string;
@@ -175,5 +197,46 @@ export const api = {
 
   deleteQuery(id: string): Promise<{ deleted: boolean }> {
     return request(`/api/queries/${id}`, { method: "DELETE" });
+  },
+
+  // ── Connection management ──────────────────────────────────────────────────
+
+  getConnections(): Promise<{ environments: ConnectionInfo[] }> {
+    return request("/api/connections");
+  },
+
+  testConnection(body: {
+    host: string; port: number; user: string; password: string;
+  }): Promise<TestConnectionResult> {
+    return request("/api/connections/test", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
+
+  createConnection(body: {
+    name: string; host: string; port: number; user: string;
+    password: string; exclude_databases: string[];
+  }): Promise<CreateConnectionResult> {
+    return request("/api/connections", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
+
+  updateConnection(
+    name: string,
+    patch: Partial<{ host: string; port: number; user: string; password: string; exclude_databases: string[] }>
+  ): Promise<CreateConnectionResult> {
+    return request(`/api/connections/${encodeURIComponent(name)}`, {
+      method: "PUT",
+      body: JSON.stringify(patch),
+    });
+  },
+
+  deleteConnection(name: string): Promise<{ deleted: boolean }> {
+    return request(`/api/connections/${encodeURIComponent(name)}`, {
+      method: "DELETE",
+    });
   },
 };
