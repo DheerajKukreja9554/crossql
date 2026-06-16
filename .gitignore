@@ -22,6 +22,9 @@ e2e/test-results/
 e2e/playwright-report/
 e2e/.playwright/
 
+# Logs
+logs/
+
 # OS
 .DS_Store
 *.swp
@@ -36,3 +39,8 @@ e2e/.playwright/
 
 # Superpowers brainstorm artifacts
 .superpowers/
+
+# Remember logs and tmp files
+.remember/logs/
+.remember/tmp
+.pids

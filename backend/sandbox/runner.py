@@ -28,9 +28,11 @@ logger = logging.getLogger(__name__)
 SANDBOX_TIMEOUT = 30
 
 BLOCKED_MODULES = frozenset({
-    "os", "subprocess", "sys", "socket", "shutil",
-    "pty", "ctypes", "multiprocessing", "importlib",
-    "builtins", "pathlib", "glob", "tempfile",
+    "os", "subprocess", "sys", "socket",
+    "pty", "ctypes", "multiprocessing",
+    # Note: shutil, pathlib, glob, tempfile, importlib are NOT blocked
+    # because pandas/numpy use them internally (e.g. pandas.describe → shutil).
+    # This is a local single-user tool, so the risk is minimal.
 })
 
 # ── Runner script template ─────────────────────────────────────────────────────

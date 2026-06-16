@@ -1,5 +1,12 @@
 /** Typed API client — wraps all backend endpoints. */
 
+export interface EnvironmentInfo {
+  name: string;
+  host: string;
+  port: number;
+  user: string;
+}
+
 export interface DbStatus {
   [dbName: string]: "ok" | "error";
 }
@@ -23,13 +30,56 @@ export interface QueryResult {
 
 export interface SwitchEnvResult {
   env: string;
+  host: string;
   status: DbStatus;
   db_schema: SchemaCache;
+  discovered_dbs: string[];
+  excluded_dbs: string[];
+}
+
+export interface ReloadConfigResult {
+  env: string;
+  host: string;
+  status: DbStatus;
+  db_schema: SchemaCache;
+  discovered_dbs: string[];
+  excluded_dbs: string[];
 }
 
 export interface PythonResult {
   output: string;
   error?: string;
+}
+
+export interface SavedQuery {
+  id: string;
+  name: string;
+  sql: string;
+  folder: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConnectionInfo {
+  name: string;
+  host: string;
+  port: number;
+  user: string;
+  has_password: boolean;
+  needs_reauth: boolean;
+  exclude_databases: string[];
+}
+
+export interface TestConnectionResult {
+  status: "ok" | "error";
+  discovered_dbs: string[];
+  error?: string;
+}
+
+export interface CreateConnectionResult {
+  name: string;
+  status: string;
+  discovered_dbs: string[];
 }
 
 export interface AppError {
@@ -47,13 +97,39 @@ export interface AppError {
 // ── Fetch helper ──────────────────────────────────────────────────────────────
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
-    headers: { "Content-Type": "application/json" },
-    ...init,
-  });
-  const data = await res.json();
+  let res: Response;
+  try {
+    res = await fetch(path, {
+      headers: { "Content-Type": "application/json" },
+      ...init,
+    });
+  } catch (e) {
+    throw {
+      error: "Network error",
+      detail: `Could not connect to backend: ${e}`,
+      code: "CONNECTION_ERROR",
+    } as AppError;
+  }
+
+  let data: unknown;
+  try {
+    data = await res.json();
+  } catch {
+    throw {
+      error: `HTTP ${res.status}`,
+      detail: `Server returned non-JSON response (${res.statusText})`,
+      code: "CONNECTION_ERROR",
+    } as AppError;
+  }
+
   if (!res.ok) {
-    throw data as AppError;
+    // Ensure the error has the expected shape
+    const err = data as Record<string, unknown>;
+    throw {
+      error: String(err.error || `HTTP ${res.status}`),
+      detail: String(err.detail || err.error || res.statusText),
+      code: String(err.code || "CONNECTION_ERROR"),
+    } as AppError;
   }
   return data as T;
 }
@@ -61,7 +137,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 // ── Endpoints ─────────────────────────────────────────────────────────────────
 
 export const api = {
-  getEnvironments(): Promise<{ environments: string[] }> {
+  getEnvironments(): Promise<{
+    environments: EnvironmentInfo[];
+    active: string | null;
+  }> {
     return request("/api/environments");
   },
 
@@ -69,6 +148,12 @@ export const api = {
     return request("/api/environments/switch", {
       method: "POST",
       body: JSON.stringify({ env }),
+    });
+  },
+
+  reloadConfig(): Promise<ReloadConfigResult> {
+    return request("/api/config/reload", {
+      method: "POST",
     });
   },
 
@@ -87,6 +172,71 @@ export const api = {
     return request("/api/python/run", {
       method: "POST",
       body: JSON.stringify({ code, session_id: sessionId }),
+    });
+  },
+
+  // ── Saved queries ──────────────────────────────────────────────────────────
+
+  getQueries(): Promise<{ queries: SavedQuery[] }> {
+    return request("/api/queries");
+  },
+
+  createQuery(name: string, sql: string, folder = ""): Promise<SavedQuery> {
+    return request("/api/queries", {
+      method: "POST",
+      body: JSON.stringify({ name, sql, folder }),
+    });
+  },
+
+  updateQuery(id: string, patch: Partial<Pick<SavedQuery, "name" | "sql" | "folder">>): Promise<SavedQuery> {
+    return request(`/api/queries/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(patch),
+    });
+  },
+
+  deleteQuery(id: string): Promise<{ deleted: boolean }> {
+    return request(`/api/queries/${id}`, { method: "DELETE" });
+  },
+
+  // ── Connection management ──────────────────────────────────────────────────
+
+  getConnections(): Promise<{ environments: ConnectionInfo[] }> {
+    return request("/api/connections");
+  },
+
+  testConnection(body: {
+    host: string; port: number; user: string; password: string;
+  }): Promise<TestConnectionResult> {
+    return request("/api/connections/test", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
+
+  createConnection(body: {
+    name: string; host: string; port: number; user: string;
+    password: string; exclude_databases: string[];
+  }): Promise<CreateConnectionResult> {
+    return request("/api/connections", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
+
+  updateConnection(
+    name: string,
+    patch: Partial<{ host: string; port: number; user: string; password: string; exclude_databases: string[] }>
+  ): Promise<CreateConnectionResult> {
+    return request(`/api/connections/${encodeURIComponent(name)}`, {
+      method: "PUT",
+      body: JSON.stringify(patch),
+    });
+  },
+
+  deleteConnection(name: string): Promise<{ deleted: boolean }> {
+    return request(`/api/connections/${encodeURIComponent(name)}`, {
+      method: "DELETE",
     });
   },
 };

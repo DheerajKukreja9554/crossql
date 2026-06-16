@@ -27,8 +27,16 @@ class ErrorResponse(BaseModel):
 
 # ── Environments ───────────────────────────────────────────────────────────────
 
+class EnvironmentInfo(BaseModel):
+    name: str
+    host: str
+    port: int
+    user: str
+
+
 class EnvironmentsResponse(BaseModel):
-    environments: list[str]
+    environments: list[EnvironmentInfo]
+    active: str | None = None
 
 
 class SwitchEnvRequest(BaseModel):
@@ -42,8 +50,22 @@ class DbStatus(str, Enum):
 
 class SwitchEnvResponse(BaseModel):
     env: str
-    status: dict[str, DbStatus]              # {db_name: "ok"|"error"}
-    db_schema: dict[str, dict[str, list[str]]]  # SchemaCache: {db: {table: [cols]}}
+    host: str
+    status: dict[str, DbStatus]                 # {db_name: "ok"|"error"}
+    db_schema: dict[str, dict[str, list[str]]]  # SchemaCache
+    discovered_dbs: list[str]                    # all discovered DBs
+    excluded_dbs: list[str]                      # system/excluded DBs
+
+
+# ── Config Reload ─────────────────────────────────────────────────────────────
+
+class ReloadConfigResponse(BaseModel):
+    env: str
+    host: str
+    status: dict[str, DbStatus]
+    db_schema: dict[str, dict[str, list[str]]]
+    discovered_dbs: list[str]
+    excluded_dbs: list[str]
 
 
 # ── Schema ─────────────────────────────────────────────────────────────────────
@@ -74,7 +96,7 @@ class RunQueryResponse(BaseModel):
     row_count: int
     timing: TimingInfo
     session_id: str
-    warning: str | None = None  # e.g. row limit approaching
+    warning: str | None = None
 
 
 # ── Python ─────────────────────────────────────────────────────────────────────
@@ -87,3 +109,82 @@ class RunPythonRequest(BaseModel):
 class RunPythonResponse(BaseModel):
     output: str
     error: str | None = None
+
+
+# ── Connections CRUD ──────────────────────────────────────────────────────────
+
+class ConnectionInfo(BaseModel):
+    name: str
+    host: str
+    port: int
+    user: str
+    has_password: bool
+    needs_reauth: bool
+    exclude_databases: list[str] = []
+
+
+class ConnectionsListResponse(BaseModel):
+    environments: list[ConnectionInfo]
+
+
+class CreateConnectionRequest(BaseModel):
+    name: str
+    host: str
+    port: int = 5432
+    user: str
+    password: str
+    exclude_databases: list[str] = []
+
+
+class CreateConnectionResponse(BaseModel):
+    name: str
+    status: str  # "ok" | "error"
+    discovered_dbs: list[str]
+
+
+class UpdateConnectionRequest(BaseModel):
+    host: str | None = None
+    port: int | None = None
+    user: str | None = None
+    password: str | None = None
+    exclude_databases: list[str] | None = None
+
+
+class TestConnectionRequest(BaseModel):
+    host: str
+    port: int = 5432
+    user: str
+    password: str
+
+
+class TestConnectionResponse(BaseModel):
+    status: str  # "ok" | "error"
+    discovered_dbs: list[str] = []
+    error: str | None = None
+
+
+# ── Saved Queries ─────────────────────────────────────────────────────────────
+
+class SavedQueryModel(BaseModel):
+    id: str
+    name: str
+    sql: str
+    folder: str = ""
+    created_at: str
+    updated_at: str
+
+
+class SavedQueriesResponse(BaseModel):
+    queries: list[SavedQueryModel]
+
+
+class CreateQueryRequest(BaseModel):
+    name: str
+    sql: str
+    folder: str = ""
+
+
+class UpdateQueryRequest(BaseModel):
+    name: str | None = None
+    sql: str | None = None
+    folder: str | None = None

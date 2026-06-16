@@ -1,51 +1,36 @@
-# DB Simplifier - Connection Configuration
+# CrossQL - Connection Configuration
 # Copy this file to connections.yaml and fill in your values.
 # connections.yaml is gitignored - never commit real credentials.
 #
+# Each environment points to a PostgreSQL server.
+# CrossQL auto-discovers all databases on the server.
 # Password supports ${ENV_VAR} interpolation, e.g. password: "${PROD_DB_PASS}"
 
 environments:
   development:
-    databases:
-      users_db:
-        host: localhost
-        port: 5434        # Docker maps to 5434 to avoid conflicts with local PostgreSQL
-        dbname: users
-        user: dev_user
-        password: dev_pass
-      orders_db:
-        host: localhost
-        port: 5433
-        dbname: orders
-        user: dev_user
-        password: dev_pass
+    host: localhost
+    port: 5432
+    user: dev_user
+    password: dev_pass
+
+  sandbox:
+    host: vegapay-sandbox-postgres-server.postgres.database.azure.com
+    port: 5432
+    user: postgres
+    password: "${SANDBOX_DB_PASSWORD}"
+    # Optionally exclude databases you don't want to query:
+    # exclude_databases:
+    #   - analytics_readonly
+    #   - notifications
 
   staging:
-    databases:
-      users_db:
-        host: staging-db.internal
-        port: 5432
-        dbname: users
-        user: staging_user
-        password: "${STAGING_DB_PASSWORD}"
-      orders_db:
-        host: staging-db.internal
-        port: 5433
-        dbname: orders
-        user: staging_user
-        password: "${STAGING_DB_PASSWORD}"
+    host: vegapay-staging-postgres-server.postgres.database.azure.com
+    port: 5432
+    user: postgres
+    password: "${STAGING_DB_PASSWORD}"
 
   production:
-    databases:
-      users_db:
-        host: prod-db.internal
-        port: 5432
-        dbname: users
-        user: readonly_user
-        password: "${PROD_DB_PASSWORD}"
-      orders_db:
-        host: prod-db.internal
-        port: 5433
-        dbname: orders
-        user: readonly_user
-        password: "${PROD_DB_PASSWORD}"
+    host: vegapay-prod-postgres-server.postgres.database.azure.com
+    port: 5432
+    user: app_readonly
+    password: "${PROD_DB_PASSWORD}"

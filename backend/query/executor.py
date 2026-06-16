@@ -10,16 +10,51 @@ import asyncio
 import json
 import logging
 import time
+import uuid
 from dataclasses import dataclass, field
+from datetime import date, datetime, timedelta
+from decimal import Decimal
 from typing import Any
 
 import duckdb
+import numpy as np
 import pandas as pd
 
 from connections import ConnectionManager
 from query.parser import QueryPlan, SubQuery
 
 logger = logging.getLogger(__name__)
+
+
+def _sanitize_value(v: Any) -> Any:
+    """Convert a value to a JSON-serializable type."""
+    if v is None or isinstance(v, (str, int, bool)):
+        return v
+    if isinstance(v, Decimal):
+        return float(v)
+    if isinstance(v, float):
+        if np.isnan(v) or np.isinf(v):
+            return None
+        return v
+    if isinstance(v, (datetime, date)):
+        return v.isoformat()
+    if isinstance(v, timedelta):
+        return str(v)
+    if isinstance(v, uuid.UUID):
+        return str(v)
+    if isinstance(v, bytes):
+        return v.hex()
+    if isinstance(v, (np.integer,)):
+        return int(v)
+    if isinstance(v, (np.floating,)):
+        return float(v)
+    return str(v)
+
+
+def _sanitize_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Sanitize all values in a list of row dicts for JSON serialization."""
+    return [{k: _sanitize_value(v) for k, v in row.items()} for row in rows]
+
 
 # ── Row limit defaults ─────────────────────────────────────────────────────────
 DEFAULT_ROW_LIMIT = 50_000
@@ -144,7 +179,7 @@ async def _execute_single(
     sq = plan.sub_queries[0]
     sub = await _run_sub_query(sq, manager)
 
-    rows = sub.df.to_dict(orient="records")
+    rows = _sanitize_rows(sub.df.to_dict(orient="records"))
     columns = list(sub.df.columns)
 
     result = QueryResult(
@@ -230,6 +265,6 @@ def _merge_in_duckdb(
     finally:
         conn.close()
 
-    rows = result_df.to_dict(orient="records")
+    rows = _sanitize_rows(result_df.to_dict(orient="records"))
     columns = list(result_df.columns)
     return result_df, rows, columns
